@@ -6,7 +6,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -143,7 +144,7 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-w-[210px] sm:min-w-[220px] lg:min-w-[230px] flex-1 flex-col rounded-none border p-2.5 transition-colors ${
+      className={`flex min-w-[200px] flex-1 flex-col rounded-none border p-2.5 transition-colors sm:min-w-[220px] lg:min-w-[230px] ${
         isOver
           ? "border-terra/50 bg-terra/[0.07]"
           : highlight
@@ -205,7 +206,8 @@ export default function Pipeline() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor),
   );
 
@@ -297,8 +299,8 @@ export default function Pipeline() {
   return (
     <div className="flex h-full flex-col p-4 sm:p-5">
       {/* Header */}
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-display text-base font-medium text-cream sm:text-lg">Live pipeline</h3>
             <Pill tone="terra">
@@ -306,11 +308,15 @@ export default function Pipeline() {
             </Pill>
           </div>
           <p className="mt-1 text-[12.5px] text-sand">
-            Every lead has a stage, a score and a next action. <span className="text-cream-2">Drag a card into Won.</span>
+            Every lead has a stage, a score and a next action.{" "}
+            <span className="text-cream-2">
+              <span className="sm:hidden">Press and hold a card, then drag it into Won.</span>
+              <span className="hidden sm:inline">Drag a card into Won.</span>
+            </span>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 font-mono text-[11px] text-sand tabular-nums">
+          <span className="w-full font-mono text-[11px] text-sand tabular-nums sm:mr-1 sm:w-auto">
             {leads.length + STAGES.reduce((a, s) => a + s.extra, 0)} leads · {money(totalValue)} shown
           </span>
           {(["ALL", "HOT", "WARM", "COLD"] as const).map((f) => (
@@ -330,7 +336,10 @@ export default function Pipeline() {
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
         >
-          <div className="scroll-thin -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2" data-lenis-prevent>
+          <div
+            className="scroll-thin scroll-x -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2 touch-pan-x"
+            data-lenis-prevent
+          >
             {STAGES.map((s) => (
               <Column
                 key={s.id}
@@ -356,8 +365,11 @@ export default function Pipeline() {
 
         {/* Slide-over: orchestration or lead profile */}
         <aside
-          className={`absolute inset-y-0 right-0 z-10 flex w-[min(300px,100%)] flex-col gap-3 transition-all duration-500 ease-[var(--ease-flow)] ${
-            orch || selected ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0"
+          data-lenis-prevent
+          className={`scroll-thin absolute inset-x-0 bottom-0 z-10 flex max-h-[85%] flex-col gap-3 overflow-y-auto overscroll-contain transition-all duration-500 ease-[var(--ease-flow)] sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:max-h-none sm:w-[min(300px,100%)] sm:overflow-visible ${
+            orch || selected
+              ? "translate-y-0 opacity-100 sm:translate-x-0 sm:translate-y-0"
+              : "pointer-events-none translate-y-6 opacity-0 sm:translate-x-6 sm:translate-y-0"
           }`}
         >
           {orch ? (

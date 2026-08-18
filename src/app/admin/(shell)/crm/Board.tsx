@@ -425,7 +425,7 @@ export default function Board({
         width="max-w-2xl"
       >
         <form onSubmit={submitLead} className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Contact name">
               <Input name="name" required defaultValue={openLead?.name ?? ""} placeholder="Nadia Perera" />
             </Field>

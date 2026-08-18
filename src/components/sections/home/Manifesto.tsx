@@ -15,8 +15,8 @@ const FACETS: Facet[] = [
   {
     n: "01",
     label: "The company",
-    title: "Small, senior, close to the work",
-    desc: "The person who maps your operation is the person who builds it. No account layer, no handover to juniors, no ticket queue.",
+    title: "Built directly by the team you talk to",
+    desc: "You work directly with the people designing and engineering your system. No account managers, no handoffs, and no layers between your business and the build.",
     img: "/art/ic-designer.webp",
   },
   {
@@ -44,7 +44,7 @@ export default function Manifesto() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           {/* Statement */}
           <ScrollReveal className="lg:sticky lg:top-28 lg:self-start">
             <p className="eyebrow">Who we are</p>
@@ -68,20 +68,6 @@ export default function Manifesto() {
                 className="float-y relative h-auto w-[220px] drop-shadow-[0_24px_48px_rgba(0,0,0,0.6)]"
               />
             </div>
-
-            <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-cream/10 pt-6">
-              {[
-                ["Partner", "not a vendor"],
-                ["Senior", "builders only"],
-                ["Mon–Sat", "office hours"],
-              ].map(([big, small]) => (
-                <div key={small}>
-                  <dt className="sr-only">{small}</dt>
-                  <dd className="font-display text-2xl text-cream">{big}</dd>
-                  <dd className="mt-1 text-[10px] uppercase tracking-[0.16em] text-sand">{small}</dd>
-                </div>
-              ))}
-            </dl>
           </ScrollReveal>
 
           {/* Three facets of the company */}
@@ -119,13 +105,10 @@ export default function Manifesto() {
               </li>
             ))}
 
-            <li className="mt-2 flex flex-col gap-3 border-t border-cream/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-[12.5px] text-sand">
-                The dashboard below isn&apos;t a mockup — it&apos;s our own work, running live.
-              </p>
+            <li className="mt-2 flex border-t border-cream/10 pt-5 sm:justify-end">
               <Link
                 href="/about"
-                className="group inline-flex items-center gap-2 text-[13px] text-cream-2 transition-colors hover:text-cream"
+                className="group inline-flex min-h-[40px] items-center gap-2 py-1.5 text-[13px] text-cream-2 transition-colors hover:text-cream"
               >
                 More about the company
                 <svg

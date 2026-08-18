@@ -77,7 +77,7 @@ export default function Ledger({
   return (
     <>
       {/* Position */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Income to date" value={moneyShort(income)} sub={`${totals.entries ?? 0} entries in the ledger`} tone="success" icon={<Icon.up size={15} />} />
         <Stat label="Expenses to date" value={moneyShort(expense)} sub="Everything the business has spent" tone="terra" icon={<Icon.down size={15} />} />
         <Stat
@@ -161,7 +161,7 @@ export default function Ledger({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_300px]">
         <Panel bodyClass="p-0">
           {entries.length === 0 ? (
             <div className="p-4">
@@ -340,7 +340,7 @@ export default function Ledger({
             />
           </Field>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Amount (Rs)">
               <Input name="amount" type="number" min="0" step="0.01" required defaultValue={modal?.entry?.amount ?? ""} />
             </Field>

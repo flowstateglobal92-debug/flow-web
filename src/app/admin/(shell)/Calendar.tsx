@@ -196,7 +196,7 @@ export default function Calendar({
             <Input name="title" required defaultValue={modal?.event?.title ?? ""} placeholder="Call Nadia about the proposal" />
           </Field>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Starts">
               <Input name="starts_at" type="datetime-local" required defaultValue={defaultStart} />
             </Field>

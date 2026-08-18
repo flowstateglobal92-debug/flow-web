@@ -54,13 +54,13 @@ export default function NextSteps() {
           </p>
         </ScrollReveal>
 
-        <div className="mt-12 grid gap-5 sm:mt-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-6">
+        <div className="mt-12 grid grid-cols-1 gap-5 sm:mt-16 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-6">
           <ScrollReveal as="ol" stagger="[data-step]" y={30} className="glass rounded-3xl px-5 sm:px-7">
             {STEPS.map((s) => (
               <li
                 key={s.n}
                 data-step
-                className="grid gap-3 border-t border-cream/[0.08] py-6 first:border-t-0 sm:grid-cols-[56px_170px_1fr] sm:gap-6"
+                className="grid grid-cols-1 gap-3 border-t border-cream/[0.08] py-6 first:border-t-0 sm:grid-cols-[56px_170px_1fr] sm:gap-6"
               >
                 <span className="font-mono text-[11px] tracking-[0.2em] text-terra-bright">{s.n}</span>
                 <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-sand">{s.when}</span>

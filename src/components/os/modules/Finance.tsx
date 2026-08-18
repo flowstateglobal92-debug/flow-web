@@ -277,7 +277,7 @@ export default function Finance() {
       </div>
 
       {/* Main */}
-      <div className="grid flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid grid-cols-1 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
         {/* Invoices */}
         <div className="flex min-w-0 flex-col rounded-none border border-cream/[0.07] bg-ink/25 p-2">
           <div className="flex items-center justify-between px-2 pb-2 pt-1">
@@ -286,10 +286,13 @@ export default function Finance() {
               <span className="text-[12px] font-medium uppercase tracking-[0.12em] text-cream-2">Invoices</span>
               <span className="font-mono text-[11px] text-sand tabular-nums">{invoices.length}</span>
             </div>
-            <span className="text-[10.5px] text-sand">Click a row for instalments</span>
+            <span className="text-[10.5px] text-sand">
+              <span className="sm:hidden">Swipe · tap a row</span>
+              <span className="hidden sm:inline">Click a row for instalments</span>
+            </span>
           </div>
 
-          <div className="scroll-thin overflow-x-auto" data-lenis-prevent>
+          <div className="scroll-thin scroll-x-fade overflow-x-auto" data-lenis-prevent>
             <table className="w-full min-w-[560px] border-collapse text-left text-[12.5px]">
               <thead>
                 <tr className="text-[10px] uppercase tracking-[0.16em] text-sand">

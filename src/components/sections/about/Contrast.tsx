@@ -32,7 +32,7 @@ export default function Contrast() {
             {ROWS.map(([not, yes], i) => (
               <li
                 key={not}
-                className="grid gap-2 border-t border-cream/[0.08] py-5 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] sm:items-center sm:gap-6"
+                className="grid grid-cols-1 gap-2 border-t border-cream/[0.08] py-5 first:border-t-0 sm:grid-cols-[minmax(0,1fr)_28px_minmax(0,1fr)] sm:items-center sm:gap-6"
               >
                 <div className="flex items-start gap-3">
                   <span className="mt-0.5 font-mono text-[10px] text-sand tabular-nums">0{i + 1}</span>

@@ -56,7 +56,7 @@ export default function CTA({
               <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-transparent to-ink/20 lg:from-ink/40 lg:to-transparent" />
             </div>
 
-            <div className="relative grid gap-10 p-7 sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:p-14 xl:p-16">
+            <div className="relative grid grid-cols-1 gap-10 p-7 sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-14 lg:p-14 xl:p-16">
               {/* Copy */}
               <div className="max-w-xl">
                 <p className="eyebrow flex items-center gap-3">
@@ -68,7 +68,7 @@ export default function CTA({
                 </h2>
                 <p className="mt-6 text-pretty text-base leading-relaxed text-cream-2 sm:text-lg">{copy}</p>
 
-                <div className="mt-8 flex flex-wrap items-center gap-3">
+                <div className="mt-8 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <Link href="/contact" className="btn btn--anim btn--primary px-7 py-4">
                     <span className="btn__label">Book a walkthrough</span>
                     <svg className="btn__arrow" width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -118,7 +118,7 @@ export default function CTA({
                     </p>
                     <a
                       href="#"
-                      className="inline-flex shrink-0 items-center gap-1.5 text-[12px] font-medium text-terra-bright transition-colors hover:text-cream"
+                      className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 py-1.5 text-[12px] font-medium text-terra-bright transition-colors hover:text-cream"
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
                         <path d="M4 20l1.3-4A8.5 8.5 0 1 1 8.5 19z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />

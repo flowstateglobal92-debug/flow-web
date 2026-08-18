@@ -28,7 +28,7 @@ export default function NotFound() {
           <div className="grid-lines absolute inset-0 opacity-40" />
         </div>
 
-        <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-6 sm:px-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
+        <div className="mx-auto grid grid-cols-1 w-full max-w-7xl items-center gap-12 px-6 sm:px-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
           <div>
             <p className="eyebrow">Error 404</p>
             <h1 className="font-display mt-4 text-balance text-4xl font-medium leading-[1.05] text-cream sm:text-5xl lg:text-6xl">

@@ -203,7 +203,7 @@ export default function ImpactCalculator() {
           <div className="glass relative overflow-hidden rounded-3xl">
             <div className="glow-terra pointer-events-none absolute -right-28 -top-28 h-80 w-80 opacity-30" />
 
-            <div className="relative grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+            <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
               {/* LEFT · inputs */}
               <div className="border-b border-cream/10 p-5 sm:p-7 lg:border-b-0 lg:border-r">
                 <div className="flex items-start justify-between gap-3">
@@ -215,14 +215,16 @@ export default function ImpactCalculator() {
                       </Pill>
                     </div>
                     <p className="mt-1 text-[12.5px] text-sand">
-                      <span className="text-cream-2">Drag each slider.</span> Results update on the right.
+                      <span className="text-cream-2">Drag each slider.</span>{" "}
+                      <span className="sm:hidden">Results update below.</span>
+                      <span className="hidden sm:inline">Results update on the right.</span>
                     </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setInputs(DEFAULTS)}
                     disabled={isDefault}
-                    className="inline-flex shrink-0 items-center gap-1.5 rounded-none border border-cream/12 bg-cream/[0.03] px-3 py-1.5 text-[12px] font-medium text-cream-2 transition-all hover:border-cream/30 hover:text-cream disabled:opacity-40"
+                    className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-none border border-cream/12 bg-cream/[0.03] px-3 py-1.5 text-[12px] font-medium text-cream-2 transition-all hover:border-cream/30 hover:text-cream disabled:opacity-40"
                   >
                     Reset
                   </button>

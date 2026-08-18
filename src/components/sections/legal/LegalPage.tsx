@@ -47,7 +47,7 @@ export default function LegalPage({
           {/* Contents */}
           <nav aria-label="On this page" className="glass mt-10 rounded-2xl p-5 sm:p-6">
             <p className="text-[10px] uppercase tracking-[0.18em] text-sand">Contents</p>
-            <ol className="mt-3 grid gap-x-8 gap-y-2 sm:grid-cols-2">
+            <ol className="mt-2 grid grid-cols-1 gap-x-8 sm:grid-cols-2">
               {sections.map((s, i) => (
                 <li key={s.heading} className="flex items-baseline gap-3">
                   <span className="font-mono text-[10px] text-terra-bright tabular-nums">
@@ -55,7 +55,7 @@ export default function LegalPage({
                   </span>
                   <a
                     href={`#s${i + 1}`}
-                    className="text-[13.5px] text-cream-2 transition-colors hover:text-cream"
+                    className="inline-flex min-h-[40px] items-center py-2 text-[13.5px] text-cream-2 transition-colors hover:text-cream"
                   >
                     {s.heading}
                   </a>
@@ -94,16 +94,20 @@ export default function LegalPage({
               </a>{" "}
               and we&apos;ll answer within one working day.
             </p>
-            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 border-t border-cream/10 pt-4 text-[13px]">
-              <Link href="/privacy" className="text-cream-2 transition-colors hover:text-cream">
-                Privacy Policy
-              </Link>
-              <Link href="/terms" className="text-cream-2 transition-colors hover:text-cream">
-                Terms of Service
-              </Link>
-              <Link href="/contact" className="text-cream-2 transition-colors hover:text-cream">
-                Contact us
-              </Link>
+            <div className="mt-4 flex flex-wrap gap-x-6 border-t border-cream/10 pt-2 text-[13px]">
+              {[
+                { href: "/privacy", label: "Privacy Policy" },
+                { href: "/terms", label: "Terms of Service" },
+                { href: "/contact", label: "Contact us" },
+              ].map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="inline-flex min-h-[40px] items-center py-2 text-cream-2 transition-colors hover:text-cream"
+                >
+                  {l.label}
+                </Link>
+              ))}
             </div>
           </div>
         </div>

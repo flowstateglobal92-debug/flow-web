@@ -108,7 +108,7 @@ export default function PageHero({
     <section
       id={id}
       ref={root}
-      className={`relative isolate flex flex-col justify-end overflow-hidden pb-10 pt-[calc(var(--nav-h)+2rem)] sm:pb-14 ${
+      className={`relative isolate flex flex-col justify-end overflow-hidden pb-8 pt-[calc(var(--nav-h)+1.5rem)] sm:pb-14 sm:pt-[calc(var(--nav-h)+2rem)] ${
         compact ? "min-h-[72svh]" : "min-h-[86svh]"
       }`}
     >
@@ -136,12 +136,14 @@ export default function PageHero({
         </div>
         {/* With an aside panel the imagery becomes atmosphere, not a subject:
             wash the whole frame so the panel stays the brightest thing on it. */}
+        {/* Phones read the copy across the whole frame, so the wash carries
+            further right below `sm`; the directional gradient takes over above. */}
         <div
           className={`absolute inset-0 bg-gradient-to-r ${
-            aside ? "from-ink/92 via-ink/70 to-ink/80" : "from-ink/90 via-ink/45 to-ink/5"
+            aside ? "from-ink/92 via-ink/70 to-ink/80" : "from-ink/90 via-ink/60 to-ink/30 sm:via-ink/45 sm:to-ink/5"
           }`}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-transparent to-ink" />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/70 via-ink/15 to-ink sm:via-transparent" />
         <div className="grid-lines absolute inset-0 opacity-40" />
         <div className="glow-cream absolute -left-52 bottom-0 h-[50vh] w-[50vh] opacity-25" />
       </div>
@@ -157,7 +159,9 @@ export default function PageHero({
           </p>
           <h1
             className={`font-display mt-5 font-medium leading-[1.04] text-cream ${
-              aside ? "text-[2.6rem] sm:text-5xl lg:text-[3.6rem]" : "text-[2.75rem] sm:text-6xl lg:text-[4.25rem]"
+              aside
+                ? "text-[clamp(2.15rem,10.5vw,2.6rem)] sm:text-5xl lg:text-[3.6rem]"
+                : "text-[clamp(2.25rem,11.5vw,2.75rem)] sm:text-6xl lg:text-[4.25rem]"
             }`}
           >
             {lines.map((line, i) => (
@@ -171,13 +175,13 @@ export default function PageHero({
           {sub && (
             <p
               data-ph-sub
-              className="mt-7 max-w-[34rem] text-justify text-base leading-relaxed text-cream-2 [text-align-last:left] hyphens-auto sm:text-[1.075rem]"
+              className="mt-6 max-w-[34rem] text-justify text-[0.9375rem] leading-relaxed text-cream-2 [text-align-last:left] hyphens-auto sm:mt-7 sm:text-[1.075rem]"
             >
               {sub}
             </p>
           )}
           {actions && (
-            <div data-ph-actions className="mt-9 flex flex-wrap items-center gap-3">
+            <div data-ph-actions className="mt-7 flex flex-col items-stretch gap-3 sm:mt-9 sm:flex-row sm:flex-wrap sm:items-center">
               {actions}
             </div>
           )}
@@ -190,7 +194,7 @@ export default function PageHero({
       </div>
 
       {children && (
-        <div data-ph-extra className="relative mx-auto mt-14 w-full max-w-7xl px-6 sm:px-8">
+        <div data-ph-extra className="relative mx-auto mt-10 w-full max-w-7xl px-6 sm:mt-14 sm:px-8">
           {children}
         </div>
       )}

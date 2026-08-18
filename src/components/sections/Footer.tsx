@@ -38,12 +38,15 @@ export default function Footer() {
       <div className="hairline" />
       <FooterBackdrop />
 
-      <div className="relative mx-auto max-w-7xl px-6 pb-10 pt-14 sm:px-8 sm:pt-16">
+      <div
+        className="relative mx-auto max-w-7xl px-6 pb-10 pt-14 sm:px-8 sm:pt-16"
+        style={{ paddingBottom: "calc(2.5rem + var(--safe-b))" }}
+      >
         {/* Top row */}
-        <div className="grid gap-12 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr] lg:gap-8">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 sm:gap-y-12 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr] lg:gap-8">
           {/* Brand */}
-          <div>
-            <Link href="/" className="inline-flex items-center gap-3" aria-label={`${SITE.name} — home`}>
+          <div className="col-span-2 lg:col-span-1">
+            <Link href="/" className="inline-flex items-center gap-3 py-1" aria-label={`${SITE.name} — home`}>
               <Image
                 src="/brand/mark-256.webp"
                 alt=""
@@ -68,7 +71,7 @@ export default function Footer() {
             <address className="mt-6 space-y-2 not-italic">
               <a
                 href={`mailto:${SITE.email}`}
-                className="group inline-flex items-center gap-2.5 text-[13.5px] text-cream-2 transition-colors hover:text-cream"
+                className="group inline-flex min-h-[40px] items-center gap-2.5 py-1.5 text-[13.5px] text-cream-2 transition-colors hover:text-cream"
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-sand transition-colors group-hover:text-terra-bright">
                   <rect x="3.5" y="5.5" width="17" height="13" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -93,14 +96,14 @@ export default function Footer() {
 
           {/* Link columns */}
           {COLUMNS.map((col) => (
-            <nav key={col.title} aria-label={col.title}>
+            <nav key={col.title} aria-label={col.title} className="min-w-0">
               <p className="text-[10px] uppercase tracking-[0.18em] text-sand">{col.title}</p>
-              <ul className="mt-4 space-y-2.5">
+              <ul className="mt-2 space-y-0.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <Link
                       href={l.href}
-                      className="group inline-flex items-center gap-2 text-[13.5px] text-cream-2 transition-colors hover:text-cream"
+                      className="group inline-flex min-h-[40px] items-center gap-2 py-2 text-[13.5px] text-cream-2 transition-colors hover:text-cream"
                     >
                       <span className="h-px w-0 bg-terra-bright transition-all duration-300 ease-[var(--ease-flow)] group-hover:w-3" />
                       {l.label}
@@ -112,7 +115,7 @@ export default function Footer() {
           ))}
 
           {/* Note */}
-          <div className="lg:justify-self-end lg:max-w-[240px]">
+          <div className="col-span-2 lg:col-span-1 lg:max-w-[240px] lg:justify-self-end">
             <p className="text-[10px] uppercase tracking-[0.18em] text-sand">Walkthrough</p>
             <p className="mt-4 text-[13px] leading-relaxed text-cream-2">
               30 minutes. No obligation. You keep the automation map.
@@ -132,15 +135,36 @@ export default function Footer() {
 
         {/* Bottom row */}
         <div className="mt-6 flex flex-col gap-4 border-t border-cream/[0.07] pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[12px] text-sand">
-            © {year} {SITE.name}. All rights reserved.
-          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
+            <p className="text-[12px] text-sand">
+              © {year} {SITE.name}. All rights reserved.
+            </p>
+            <div className="inline-flex items-center gap-2 text-[12px] text-sand">
+              <span>Built and Designed by</span>
+              <a
+                href="https://www.arcai.agency"
+                target="_blank"
+                rel="noopener"
+                title="ARC AI — AI Systems & Automation Agency"
+                aria-label="ARC AI — AI Systems & Automation Agency (opens in a new tab)"
+                className="inline-flex items-center transition-all duration-300 opacity-90 hover:opacity-100 hover:scale-105"
+              >
+                <Image
+                  src="/arclogo.webp"
+                  alt="ARC AI — AI Systems & Automation Agency"
+                  width={120}
+                  height={30}
+                  className="h-6 w-auto translate-y-[2px] object-contain"
+                />
+              </a>
+            </div>
+          </div>
           <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {LEGAL.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="text-[12px] text-sand transition-colors hover:text-cream"
+                className="inline-flex min-h-[40px] items-center py-1.5 text-[12px] text-sand transition-colors hover:text-cream"
               >
                 {l.label}
               </Link>

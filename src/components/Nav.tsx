@@ -32,18 +32,44 @@ export default function Nav() {
     setOpen(false);
   }, [pathname]);
 
+  // The sheet overlays the page: freeze the page behind it so a swipe moves the
+  // menu, not the content underneath. Lenis reads `lenis-stopped` off <html>.
+  useEffect(() => {
+    if (!open) return;
+    const html = document.documentElement;
+    html.classList.add("lenis-stopped");
+    html.style.overflow = "hidden";
+    return () => {
+      html.classList.remove("lenis-stopped");
+      html.style.overflow = "";
+    };
+  }, [open]);
+
+  // Escape closes it, like any other overlay.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex justify-center px-4 pt-4">
+    <header
+      className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 sm:px-4 sm:pt-4"
+      style={{ paddingLeft: "max(0.75rem, var(--safe-l))", paddingRight: "max(0.75rem, var(--safe-r))" }}
+    >
       <nav
-        className={`glass glass--blur flex w-full max-w-6xl items-center justify-between rounded-none py-2 pl-3 pr-2 transition-all duration-300 ${
+        className={`glass glass--blur flex w-full max-w-6xl items-center justify-between rounded-none py-1.5 pl-2.5 pr-1.5 transition-all duration-300 sm:py-2 sm:pl-3 sm:pr-2 ${
           scrolled ? "glass--strong" : ""
         }`}
         aria-label="Primary"
       >
-        <Link href="/" className="group flex items-center gap-3 pl-1" aria-label="Flow State — home">
-          <span data-nav-mark className="relative block h-11 w-11 transition-opacity duration-500">
+        <Link href="/" className="group flex items-center gap-2.5 pl-1 sm:gap-3" aria-label="Flow State — home">
+          <span data-nav-mark className="relative block h-9 w-9 transition-opacity duration-500 sm:h-11 sm:w-11">
             <span className="absolute inset-0 rounded-full bg-terra/40 blur-lg opacity-0 transition-opacity group-hover:opacity-100" />
             <Image
               src="/brand/mark.png"
@@ -51,8 +77,8 @@ export default function Nav() {
               width={598}
               height={612}
               priority
-              sizes="44px"
-              className="relative h-11 w-auto object-contain"
+              sizes="(min-width: 640px) 44px, 36px"
+              className="relative h-9 w-auto object-contain sm:h-11"
             />
           </span>
           <Image
@@ -66,7 +92,7 @@ export default function Nav() {
           />
         </Link>
 
-        <ul className="hidden items-center gap-1 md:flex">
+        <ul className="hidden items-center gap-1 lg:flex">
           {LINKS.map((l) => {
             const active = isActive(l.href);
             return (
@@ -100,10 +126,11 @@ export default function Nav() {
           </Link>
           <button
             type="button"
-            aria-label="Toggle menu"
+            aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
+            aria-controls="mobile-menu"
             onClick={() => setOpen((v) => !v)}
-            className="btn btn--ghost btn--sm h-10 w-10 !p-0 md:hidden"
+            className="btn btn--ghost btn--sm h-10 w-10 !p-0 lg:hidden"
           >
             <span className="relative block h-3 w-4">
               <span className={`absolute left-0 top-0 h-px w-full bg-cream transition-transform ${open ? "translate-y-[6px] rotate-45" : ""}`} />
@@ -114,11 +141,25 @@ export default function Nav() {
         </div>
       </nav>
 
+      {/* Backdrop — tapping outside the sheet closes it. */}
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-hidden
+        onClick={() => setOpen(false)}
+        className={`fixed inset-0 -z-10 cursor-default bg-ink/40 transition-opacity duration-300 lg:hidden ${
+          open ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+
       {/* Mobile sheet */}
       <div
-        className={`glass glass--blur glass--strong absolute left-4 right-4 top-[calc(100%+8px)] origin-top rounded-none p-3 transition-all duration-300 md:hidden ${
+        id="mobile-menu"
+        className={`glass glass--blur glass--strong scroll-thin absolute left-3 right-3 top-[calc(100%+8px)] max-h-[calc(100svh-var(--nav-h)-1.5rem)] origin-top overflow-y-auto overscroll-contain rounded-none p-3 transition-all duration-300 sm:left-4 sm:right-4 lg:hidden ${
           open ? "visible pointer-events-auto scale-100 opacity-100" : "invisible pointer-events-none scale-95 opacity-0"
         }`}
+        data-lenis-prevent
+        aria-hidden={!open}
       >
         {LINKS.map((l) => {
           const active = isActive(l.href);
@@ -128,7 +169,8 @@ export default function Nav() {
               href={l.href}
               onClick={() => setOpen(false)}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-none px-4 py-3 font-display text-base tracking-[0.02em] transition-colors hover:bg-cream/5 hover:text-cream ${
+              tabIndex={open ? undefined : -1}
+              className={`flex min-h-[48px] items-center gap-3 rounded-none px-4 py-3 font-display text-base tracking-[0.02em] transition-colors hover:bg-cream/5 hover:text-cream ${
                 active ? "text-cream" : "text-cream-2"
               }`}
             >
@@ -140,7 +182,12 @@ export default function Nav() {
             </Link>
           );
         })}
-        <Link href="/contact" onClick={() => setOpen(false)} className="btn btn--primary mt-2 w-full">
+        <Link
+          href="/contact"
+          onClick={() => setOpen(false)}
+          tabIndex={open ? undefined : -1}
+          className="btn btn--primary mt-2 w-full"
+        >
           Book a walkthrough
         </Link>
       </div>

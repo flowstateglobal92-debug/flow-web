@@ -76,7 +76,7 @@ export default function Principles() {
           as="ol"
           stagger="[data-principle]"
           y={36}
-          className="mt-12 grid gap-4 sm:mt-16 md:grid-cols-2 lg:grid-cols-3 lg:gap-5"
+          className="mt-12 grid grid-cols-1 gap-4 sm:mt-16 md:grid-cols-2 lg:grid-cols-3 lg:gap-5"
         >
           {PRINCIPLES.map((p, i) => (
             <li

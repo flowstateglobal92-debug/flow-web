@@ -33,8 +33,11 @@ export const metadata: Metadata = {
   },
   description: SITE.description,
   applicationName: SITE.name,
-  authors: [{ name: SITE.name, url: SITE.url }],
-  creator: SITE.name,
+  authors: [
+    { name: SITE.name, url: SITE.url },
+    { name: "ARC AI", url: "https://www.arcai.agency" },
+  ],
+  creator: "ARC AI",
   publisher: SITE.name,
   alternates: { canonical: SITE.url },
   category: "technology",

@@ -117,6 +117,11 @@ export function organizationSchema() {
         name: SITE.name,
         description: SITE.description,
         publisher: { "@id": abs("/#organization") },
+        creator: {
+          "@type": "Organization",
+          name: "ARC AI",
+          url: "https://www.arcai.agency",
+        },
         inLanguage: "en",
       },
     ],

@@ -604,7 +604,7 @@ export default function Inbox() {
         </div>
       </div>
 
-      <div className="grid flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_224px] xl:grid-cols-[196px_minmax(0,1fr)_228px]">
+      <div className="grid grid-cols-1 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_224px] xl:grid-cols-[196px_minmax(0,1fr)_228px]">
         {/* Conversation chips (< xl) */}
         <div className="scroll-thin -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 lg:col-span-2 xl:hidden" data-lenis-prevent>
           {list.map((c) => (

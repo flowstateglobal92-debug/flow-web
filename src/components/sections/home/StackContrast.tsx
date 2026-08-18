@@ -33,7 +33,7 @@ export default function StackContrast() {
     <div className="glass relative overflow-hidden rounded-3xl">
       <div className="glow-terra pointer-events-none absolute -right-24 top-1/2 h-72 w-72 -translate-y-1/2 opacity-40" />
 
-      <div className="relative grid lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1.1fr)]">
+      <div className="relative grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1.1fr)]">
         {/* ── Before: the usual stack ── */}
         <div className="flex flex-col border-b border-cream/10 p-6 sm:p-8 lg:border-b-0">
           <div className="flex items-baseline justify-between gap-3">
@@ -105,7 +105,7 @@ export default function StackContrast() {
           {/* The shared record underneath — the only thing that moves is the light on it. */}
           <div className="relative mt-3 overflow-hidden rounded-xl border border-cream/10 bg-ink/50 px-3.5 py-3">
             <span className="shimmer pointer-events-none absolute inset-0" />
-            <div className="relative flex items-center justify-between gap-3">
+            <div className="relative flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-sand">
                 One shared record
               </span>

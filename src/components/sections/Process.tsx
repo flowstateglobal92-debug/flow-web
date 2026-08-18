@@ -55,29 +55,32 @@ const STEPS: Step[] = [
    The path is built from the measured centre of each node so the curve always
    passes exactly through them, at any breakpoint. It bows alternately left and
    right between nodes so the journey reads as a flow rather than a ruler. */
-const RAIL_W = 72;
-const CX = RAIL_W / 2;
-const BOW = 19;
+const RAIL_W_FALLBACK = 72;
+/** How far the curve bows off centre, as a fraction of the rail's width. */
+const BOW_RATIO = 19 / 72;
 
-type Geom = { h: number; d: string; nodes: number[] };
+type Geom = { w: number; h: number; d: string; nodes: number[] };
 
-function buildPath(nodes: number[], h: number): string {
+function buildPath(nodes: number[], h: number, w: number): string {
   if (!nodes.length) return "";
-  let d = `M ${CX} 0 L ${CX} ${nodes[0].toFixed(1)}`;
+  const cx = w / 2;
+  const bow = w * BOW_RATIO;
+  let d = `M ${cx} 0 L ${cx} ${nodes[0].toFixed(1)}`;
   for (let i = 0; i < nodes.length - 1; i++) {
     const y0 = nodes[i];
     const y1 = nodes[i + 1];
     const span = y1 - y0;
-    const b = CX + (i % 2 === 0 ? BOW : -BOW);
-    d += ` C ${b} ${(y0 + span * 0.3).toFixed(1)}, ${b} ${(y0 + span * 0.7).toFixed(1)}, ${CX} ${y1.toFixed(1)}`;
+    const b = cx + (i % 2 === 0 ? bow : -bow);
+    d += ` C ${b} ${(y0 + span * 0.3).toFixed(1)}, ${b} ${(y0 + span * 0.7).toFixed(1)}, ${cx} ${y1.toFixed(1)}`;
   }
-  d += ` L ${CX} ${h.toFixed(1)}`;
+  d += ` L ${cx} ${h.toFixed(1)}`;
   return d;
 }
 
 /* ───────────── Section ───────────── */
 export default function Process() {
   const list = useRef<HTMLOListElement>(null);
+  const rail = useRef<HTMLDivElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const glowRef = useRef<SVGPathElement>(null);
   const comet = useRef<SVGGElement>(null);
@@ -97,7 +100,8 @@ export default function Process() {
       const r = a.getBoundingClientRect();
       return r.top - box.top + r.height / 2;
     });
-    setGeom({ h: box.height, nodes, d: buildPath(nodes, box.height) });
+    const w = rail.current?.clientWidth || RAIL_W_FALLBACK;
+    setGeom({ w, h: box.height, nodes, d: buildPath(nodes, box.height, w) });
   }, []);
 
   useEffect(() => {
@@ -106,6 +110,7 @@ export default function Process() {
     if (!el) return;
     const ro = new ResizeObserver(measure);
     ro.observe(el);
+    if (rail.current) ro.observe(rail.current);
     return () => ro.disconnect();
   }, [measure]);
 
@@ -207,14 +212,15 @@ export default function Process() {
         <ol ref={list} className="relative mt-14 sm:mt-20">
           {/* Rail: left of the cards on mobile, down the centre on desktop */}
           <div
+            ref={rail}
             aria-hidden
-            className="pointer-events-none absolute left-0 top-0 h-full w-[72px] [mask-image:linear-gradient(to_bottom,transparent,#000_5%,#000_95%,transparent)] lg:left-1/2 lg:-translate-x-1/2"
+            className="pointer-events-none absolute left-0 top-0 h-full w-11 [mask-image:linear-gradient(to_bottom,transparent,#000_5%,#000_95%,transparent)] sm:w-[60px] lg:left-1/2 lg:w-[72px] lg:-translate-x-1/2"
           >
             {geom && (
               <svg
-                width={RAIL_W}
+                width={geom.w}
                 height={geom.h}
-                viewBox={`0 0 ${RAIL_W} ${geom.h}`}
+                viewBox={`0 0 ${geom.w} ${geom.h}`}
                 fill="none"
                 className="overflow-visible"
               >
@@ -263,12 +269,12 @@ export default function Process() {
             return (
               <li
                 key={s.n}
-                className="relative grid grid-cols-[72px_minmax(0,1fr)] items-center pb-10 last:pb-0 sm:pb-12 lg:grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] lg:pb-14"
+                className="relative grid grid-cols-[44px_minmax(0,1fr)] items-center pb-10 last:pb-0 sm:grid-cols-[60px_minmax(0,1fr)] sm:pb-12 lg:grid-cols-[minmax(0,1fr)_72px_minmax(0,1fr)] lg:pb-14"
               >
                 {/* Node — the anchor the rail is measured from */}
                 <span
                   data-node
-                  className="relative col-start-1 row-start-1 flex h-[72px] w-[72px] items-center justify-center lg:col-start-2"
+                  className="relative col-start-1 row-start-1 flex h-[72px] w-11 items-center justify-center sm:w-[60px] lg:col-start-2 lg:w-[72px]"
                 >
                   <span
                     className={`absolute h-11 w-11 rounded-full bg-terra/20 blur-md transition-opacity duration-700 ${
@@ -330,7 +336,7 @@ export default function Process() {
           </p>
           <Link
             href="/contact"
-            className="group inline-flex items-center gap-2 text-[13px] text-cream-2 transition-colors hover:text-cream"
+            className="group inline-flex min-h-[40px] items-center gap-2 py-1.5 text-[13px] text-cream-2 transition-colors hover:text-cream"
           >
             Map your first three automations
             <svg

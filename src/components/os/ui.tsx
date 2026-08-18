@@ -218,10 +218,10 @@ export function KPI({
   className?: string;
 }) {
   return (
-    <div className={`glass-inset px-4 py-3 ${className}`}>
+    <div className={`glass-inset min-w-0 px-3 py-2.5 sm:px-4 sm:py-3 ${className}`}>
       <p className="text-[10px] uppercase tracking-[0.18em] text-sand">{label}</p>
-      <div className="mt-1 flex items-baseline gap-2">
-        <p className="font-display text-xl text-cream tabular-nums">{value}</p>
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+        <p className="font-display whitespace-nowrap text-lg text-cream tabular-nums sm:text-xl">{value}</p>
         {delta && <span className="text-[11px] text-terra-bright">{delta}</span>}
       </div>
     </div>
@@ -266,7 +266,7 @@ export function GhostButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-none border px-3 py-1.5 text-[12px] font-medium transition-all disabled:opacity-50 ${
+      className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-none border px-3 py-1.5 text-[12px] font-medium transition-all disabled:opacity-50 sm:min-h-0 ${
         active
           ? "border-terra/50 bg-terra/15 text-terra-bright"
           : "border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:text-cream"

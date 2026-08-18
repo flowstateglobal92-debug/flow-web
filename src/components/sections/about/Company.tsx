@@ -35,7 +35,7 @@ export default function Company() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 sm:px-8">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,6fr)] lg:gap-16">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,6fr)] lg:gap-16">
           {/* Promises */}
           <ScrollReveal>
             <p className="eyebrow">Working with us</p>
@@ -71,7 +71,7 @@ export default function Company() {
                 </span>
               </div>
 
-              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+              <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {ROLES.map((r, i) => (
                   <li
                     key={r.icon}
@@ -84,7 +84,7 @@ export default function Company() {
                 ))}
               </ul>
 
-              <div className="mt-6 grid gap-3 border-t border-cream/[0.07] pt-5 sm:grid-cols-3">
+              <div className="mt-6 grid grid-cols-1 gap-3 border-t border-cream/[0.07] pt-5 sm:grid-cols-3">
                 {[
                   ["Based in", "Sri Lanka"],
                   ["Office hours", "Mon–Sat"],

@@ -125,7 +125,7 @@ function ShiftRow({
   // Slight stagger so the switch reads as a wave down the list, not a flash.
   const delay = `${index * 55}ms`;
   return (
-    <li className="grid gap-2 border-t border-cream/[0.07] py-3.5 first:border-t-0 first:pt-0 last:pb-0 sm:grid-cols-[196px_1fr] sm:items-center sm:gap-6 lg:grid-cols-[212px_1fr]">
+    <li className="grid grid-cols-1 gap-2 border-t border-cream/[0.07] py-3.5 first:border-t-0 first:pt-0 last:pb-0 sm:grid-cols-[196px_1fr] sm:items-center sm:gap-6 lg:grid-cols-[212px_1fr]">
       <div className="flex items-center gap-2.5">
         <span className="font-mono text-[10px] text-terra-bright tabular-nums">0{index + 1}</span>
         <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-sand">{row.area}</span>
@@ -138,7 +138,7 @@ function ShiftRow({
         style={{ transitionDelay: delay }}
       >
         {/* Grid stacks both states in the same cell so height is stable. */}
-        <div className="grid">
+        <div className="grid grid-cols-1">
           <div
             aria-hidden={after}
             className={`col-start-1 row-start-1 flex items-center gap-3 px-3.5 py-3 transition-[opacity,transform] duration-500 ease-[var(--ease-flow)] ${
@@ -231,7 +231,7 @@ export default function BeforeAfter() {
         </ScrollReveal>
 
         <ScrollReveal y={56} className="mt-12 sm:mt-16">
-          <div className="grid gap-5 lg:grid-cols-[1fr_300px] lg:gap-6 xl:grid-cols-[1fr_320px]">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_300px] lg:gap-6 xl:grid-cols-[1fr_320px]">
             {/* Main panel */}
             <div ref={panel} className="glass relative overflow-hidden rounded-3xl p-5 sm:p-7">
               <div
@@ -306,7 +306,7 @@ export default function BeforeAfter() {
               </ul>
               <a
                 href="#impact"
-                className="mt-5 inline-flex items-center gap-1.5 text-[12px] font-medium text-terra-bright transition-colors hover:text-cream"
+                className="mt-4 inline-flex min-h-[40px] items-center gap-1.5 py-1.5 text-[12px] font-medium text-terra-bright transition-colors hover:text-cream"
               >
                 Put your own numbers on it <Icon.arrow size={13} />
               </a>

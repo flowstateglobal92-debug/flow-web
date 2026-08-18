@@ -39,7 +39,7 @@ export default function WhyUs() {
           as="ol"
           stagger="[data-reason]"
           y={28}
-          className="mt-12 grid gap-4 sm:mt-14 md:grid-cols-2 lg:grid-cols-3 lg:gap-5"
+          className="mt-12 grid grid-cols-1 gap-4 sm:mt-14 md:grid-cols-2 lg:grid-cols-3 lg:gap-5"
         >
           {REASONS.map((r) => (
             <li
@@ -60,7 +60,7 @@ export default function WhyUs() {
           </p>
           <Link
             href="/solution"
-            className="group inline-flex items-center gap-2 text-[13px] text-cream-2 transition-colors hover:text-cream"
+            className="group inline-flex min-h-[40px] items-center gap-2 py-1.5 text-[13px] text-cream-2 transition-colors hover:text-cream"
           >
             See how it fits together
             <svg

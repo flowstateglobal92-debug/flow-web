@@ -91,7 +91,7 @@ export default async function DashboardPage() {
       />
 
       {/* Top strip — one number from each area */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           label="New inquiries"
           value={newInquiries ?? 0}
@@ -121,7 +121,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_340px]">
         <Calendar events={events ?? []} leads={leadList.map((l) => ({ id: l.id, label: l.company || l.name }))} />
 
         <div className="flex flex-col gap-4">

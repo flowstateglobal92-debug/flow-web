@@ -31,7 +31,7 @@ function TitleBar() {
   }, []);
 
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-cream/10 px-4 py-3 sm:px-5">
+    <div className="flex items-center justify-between gap-3 border-b border-cream/10 px-3 py-2.5 sm:gap-4 sm:px-5 sm:py-3">
       <div className="flex items-center gap-3">
         <div className="flex gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-terra/70" />
@@ -66,9 +66,13 @@ function TitleBar() {
 function Sidebar() {
   const { module, setModule, counters } = useOS();
   return (
-    <aside className="flex flex-col border-b border-cream/10 lg:border-b-0 lg:border-r">
+    <aside className="scroll-x-fade flex flex-col border-b border-cream/10 lg:border-b-0 lg:border-r">
       {/* Horizontal on mobile, vertical on desktop */}
-      <nav className="scroll-thin flex gap-1 overflow-x-auto p-2 lg:flex-col lg:p-3" aria-label="Modules">
+      <nav
+        className="scroll-thin scroll-x flex gap-1 overflow-x-auto p-2 lg:flex-col lg:overflow-visible lg:p-3"
+        aria-label="Modules"
+        data-lenis-prevent
+      >
         {ORDER.map((id) => {
           const m = MODULE_META[id];
           const active = module === id;
@@ -210,10 +214,10 @@ function Shell() {
     <div className="relative">
       <div className="glass glass--strong overflow-hidden rounded-none">
         <TitleBar />
-        <div className="grid lg:grid-cols-[224px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 lg:grid-cols-[224px_minmax(0,1fr)]">
           <Sidebar />
-          <div className="relative min-h-[560px] bg-ink/30 sm:min-h-[600px]">
-            <div key={module} className="h-full animate-[module-in_0.55s_var(--ease-flow)]">
+          <div className="relative min-w-0 min-h-[480px] bg-ink/30 sm:min-h-[560px] lg:min-h-[600px]">
+            <div key={module} className="h-full min-w-0 animate-[module-in_0.55s_var(--ease-flow)]">
               <Active />
             </div>
           </div>

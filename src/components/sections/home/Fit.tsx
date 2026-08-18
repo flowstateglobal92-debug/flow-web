@@ -57,7 +57,7 @@ export default function Fit() {
         </ScrollReveal>
 
         <ScrollReveal y={56} className="mt-12 sm:mt-16">
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-6">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-6">
             {/* Self-check */}
             <div className="glass relative overflow-hidden rounded-3xl p-5 sm:p-7">
               <div

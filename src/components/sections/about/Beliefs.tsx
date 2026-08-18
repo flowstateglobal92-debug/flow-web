@@ -43,7 +43,7 @@ export default function Beliefs() {
             <li
               key={b.n}
               data-belief
-              className="group grid gap-3 border-b border-cream/10 py-8 sm:grid-cols-[72px_minmax(0,7fr)_minmax(0,5fr)] sm:gap-8 sm:py-10"
+              className="group grid grid-cols-1 gap-3 border-b border-cream/10 py-8 sm:grid-cols-[72px_minmax(0,7fr)_minmax(0,5fr)] sm:gap-8 sm:py-10"
             >
               <span className="font-mono text-[11px] tracking-[0.2em] text-terra-bright">{b.n}</span>
               <h3 className="font-display text-2xl font-medium leading-tight text-cream transition-colors duration-500 sm:text-3xl lg:text-[2.1rem]">

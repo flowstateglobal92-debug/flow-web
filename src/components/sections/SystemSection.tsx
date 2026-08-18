@@ -27,37 +27,43 @@ export default function SystemSection() {
           <FlowOS />
         </ScrollReveal>
 
-        <ScrollReveal className="mx-auto mt-8 flex max-w-5xl flex-col items-center gap-6 lg:flex-row lg:justify-between">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {[
-              ["Capture", "Respond & qualify"],
-              ["Convert", "Score & advance"],
-              ["Deliver", "Launch & update"],
-              ["Collect", "Invoice & collect"],
-            ].map(([a, b], i) => (
-              <div key={a} className="flex items-center gap-3 text-[12.5px]">
-                <span className="font-mono text-[10px] text-terra-bright">0{i + 1}</span>
-                <span className="text-cream">{a}</span>
-                <span className="hidden text-sand sm:inline">· {b}</span>
-              </div>
-            ))}
-          </div>
-          <Link
-            href="/solution"
-            className="group inline-flex items-center gap-2 text-[13px] text-cream-2 transition-colors hover:text-cream"
-          >
-            See the whole system, end to end
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden
-              className="transition-transform duration-300 group-hover:translate-x-0.5"
+        <ScrollReveal className="mx-auto mt-8 max-w-5xl">
+          <div className="glass flex flex-col items-center justify-between gap-4 rounded-2xl border border-cream/10 p-4 sm:flex-row sm:rounded-full sm:px-6 sm:py-3">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-4 md:gap-6">
+              {[
+                ["Capture", "Respond & qualify"],
+                ["Convert", "Score & advance"],
+                ["Deliver", "Launch & update"],
+                ["Collect", "Invoice & collect"],
+              ].map(([a, b], i) => (
+                <div
+                  key={a}
+                  className="flex items-center justify-center gap-2 rounded-lg border border-cream/[0.06] bg-cream/[0.03] px-3 py-2 text-[12.5px] sm:border-0 sm:bg-transparent sm:p-0 sm:justify-start"
+                >
+                  <span className="font-mono text-[10.5px] font-medium text-terra-bright">0{i + 1}</span>
+                  <span className="font-medium text-cream">{a}</span>
+                  <span className="hidden text-sand lg:inline">· {b}</span>
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/solution"
+              className="group inline-flex min-h-[38px] w-full items-center justify-center gap-2 rounded-xl bg-cream/[0.04] px-4 py-2 text-[12.5px] font-medium text-cream-2 transition-all hover:bg-cream/[0.08] hover:text-cream sm:w-auto sm:rounded-none sm:bg-transparent sm:p-0 sm:hover:bg-transparent"
             >
-              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
+              <span>See the whole system, end to end</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden
+                className="transition-transform duration-300 group-hover:translate-x-0.5"
+              >
+                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </Link>
+          </div>
         </ScrollReveal>
       </div>
     </section>

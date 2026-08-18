@@ -71,7 +71,7 @@ function Item({
         id={panelId}
         role="region"
         aria-labelledby={btnId}
-        className="grid transition-[grid-template-rows] duration-500 ease-[var(--ease-flow)]"
+        className="grid grid-cols-1 transition-[grid-template-rows] duration-500 ease-[var(--ease-flow)]"
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">
@@ -111,7 +111,7 @@ export default function FAQ({
       </div>
 
       <div className="mx-auto max-w-7xl px-6 sm:px-8">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <ScrollReveal className="lg:sticky lg:top-28 lg:self-start">
             <p className="eyebrow">{eyebrow}</p>
             <h2 className="font-display mt-4 text-balance text-4xl font-medium leading-[1.05] text-cream sm:text-5xl">
@@ -122,7 +122,7 @@ export default function FAQ({
               {cta.note && <p className="text-[12.5px] text-sand">{cta.note}</p>}
               <Link
                 href={cta.href}
-                className="group inline-flex items-center gap-2 text-[13px] text-cream-2 transition-colors hover:text-cream"
+                className="group inline-flex min-h-[40px] items-center gap-2 py-1.5 text-[13px] text-cream-2 transition-colors hover:text-cream"
               >
                 {cta.label}
                 <svg

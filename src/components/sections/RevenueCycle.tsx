@@ -570,7 +570,7 @@ export default function RevenueCycle() {
 
             {/* Bottom band: the checkpoint's story, revealed as the liquid arrives */}
             <div className="mt-auto grid grid-cols-[minmax(0,1fr)_300px] items-end gap-10 xl:grid-cols-[minmax(0,1fr)_340px] xl:gap-14">
-              <div className="grid">
+              <div className="grid grid-cols-1">
                 <div className={stackClass(active < 0)} aria-hidden={active >= 0}>
                   <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-sand">
                     Live automated pipeline · five checkpoints
@@ -604,7 +604,7 @@ export default function RevenueCycle() {
                 ))}
               </div>
 
-              <div className="grid">
+              <div className="grid grid-cols-1">
                 <div className={stackClass(active < 0)} aria-hidden={active >= 0}>
                   <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-sand">Checkpoints</p>
                   <ol className="mt-3 space-y-2">

@@ -13,7 +13,7 @@ export default function Story() {
       </div>
 
       <div className="mx-auto max-w-7xl px-6 sm:px-8">
-        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
+        <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
           <ScrollReveal>
             <p className="eyebrow">Why we exist</p>
             <h2 className="font-display mt-4 text-balance text-4xl font-medium leading-[1.05] text-cream sm:text-5xl lg:text-6xl">
