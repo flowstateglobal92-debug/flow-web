@@ -64,6 +64,12 @@ html.is-preloading {
 html.is-preloading [data-nav-mark] {
   opacity: 0;
 }
+/* The veil is server-rendered hidden (GSAP owns it once hydrated); the boot
+   script in <head> flags the document pre-paint so it is opaque from frame one
+   and the home page is never glimpsed behind it. */
+html.is-preloading [data-preloader] {
+  visibility: visible !important;
+}
 
 /* Lenis */
 html.lenis,

@@ -9,7 +9,7 @@ const LINKS = [
   { href: "/", label: "Home" },
   { href: "/about", label: "About" },
   { href: "/solution", label: "Our solution" },
-  { href: "/contact", label: "Contact us" },
+  { href: "/contact", label: "Contact" },
 ] as const;
 
 export default function Nav() {
@@ -74,7 +74,7 @@ export default function Nav() {
                 <Link
                   href={l.href}
                   aria-current={active ? "page" : undefined}
-                  className={`group relative flex items-center gap-2 rounded-none px-4 py-2 text-[13.5px] transition-colors ${
+                  className={`group relative flex items-center gap-2 rounded-none px-4 py-2 font-display text-[13.5px] tracking-[0.02em] transition-colors ${
                     active ? "text-cream" : "text-cream-2 hover:text-cream"
                   }`}
                 >
@@ -128,7 +128,7 @@ export default function Nav() {
               href={l.href}
               onClick={() => setOpen(false)}
               aria-current={active ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-none px-4 py-3 text-base transition-colors hover:bg-cream/5 hover:text-cream ${
+              className={`flex items-center gap-3 rounded-none px-4 py-3 font-display text-base tracking-[0.02em] transition-colors hover:bg-cream/5 hover:text-cream ${
                 active ? "text-cream" : "text-cream-2"
               }`}
             >

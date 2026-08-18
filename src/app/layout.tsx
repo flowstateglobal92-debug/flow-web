@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Sora } from "next/font/google";
 import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
 import { SITE, jsonLd, organizationSchema } from "@/lib/site";
+import { INTRO_BOOT_SCRIPT } from "@/lib/intro";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -95,10 +96,17 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} h-full antialiased`}
+      // The intro boot script adds `is-preloading` before hydration on purpose.
+      suppressHydrationWarning
     >
       <head>
         {/* The hero art is the LCP element on the home page. */}
         <link rel="preload" as="image" href="/art/hero-bg.webp" fetchPriority="high" />
+        {/* Runs before the first paint — and before <body> is parsed — so the
+            intro veil covers the home page from frame one rather than appearing
+            once hydration reaches the preloader. Kept after the preload above so
+            the LCP hint is still discovered first. */}
+        <script dangerouslySetInnerHTML={{ __html: INTRO_BOOT_SCRIPT }} />
         <script
           type="application/ld+json"
           // Organization + WebSite: the identity every page's schema points back to.
