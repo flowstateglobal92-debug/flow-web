@@ -1,69 +1,91 @@
-import Image from "next/image";
+import Nav from "@/components/Nav";
+import Preloader from "@/components/Preloader";
+import Hero from "@/components/hero/Hero";
+import Manifesto from "@/components/sections/home/Manifesto";
+import SystemSection from "@/components/sections/SystemSection";
+import WhyUs from "@/components/sections/home/WhyUs";
+import Principles from "@/components/sections/home/Principles";
+import Process from "@/components/sections/Process";
+import Fit from "@/components/sections/home/Fit";
+import FAQ, { type FaqItem } from "@/components/sections/FAQ";
+import CTA from "@/components/sections/CTA";
+import Footer from "@/components/sections/Footer";
+import { abs, jsonLd, pageMeta, pageSchema } from "@/lib/site";
+
+const HOME_FAQ: FaqItem[] = [
+  {
+    q: "Do we have to replace the tools we already use?",
+    a: "No. We map what you use today and connect what should stay — WhatsApp, your calendar, your accounting export, your website forms. The system becomes the shared record and the automation engine on top; anything that duplicates it can be retired later, on your timetable.",
+  },
+  {
+    q: "How long before something is actually running?",
+    a: "The rollout is four steps: Map, Configure, Connect, Optimize. The first automations — usually instant response and follow-up — go live inside the first two weeks. We expand from what's proven in your numbers, not from a wish list.",
+  },
+  {
+    q: "What happens when the AI isn't sure?",
+    a: "It hands over. Every conversation and playbook has a human owner, and anything that needs judgement — a price exception, an unhappy client, an unusual request — is routed to that person with the full context. Routine runs itself; approvals stay yours.",
+  },
+  {
+    q: "Do we need technical staff to run it?",
+    a: "No. Rules are written in plain business terms (Trigger → Decision → Action → Ownership) and the copilot answers questions in normal language. Owners and operations staff run it day to day; we handle configuration and changes.",
+  },
+  {
+    q: "How is it priced?",
+    a: "Per system, after the mapping call — the scope depends on which capabilities you need and what has to be connected. You'll see the automation map and the plan before anything is built, and you keep the map either way.",
+  },
+  {
+    q: "Where are you based, and can you work with us remotely?",
+    a: "We are based in Sri Lanka, and the system is designed for how business runs here — English, Sinhala and Tamil, WhatsApp-first, rupee invoicing. Mapping and rollout happen on calls and shared screens, so location isn't a constraint.",
+  },
+];
+
+export const metadata = pageMeta({
+  title: "Flow State — AI systems that put your business in flow",
+  absoluteTitle: true,
+  description:
+    "Flow State designs custom AI and automation systems for owner-led businesses in Sri Lanka — one shared record, one automation engine, one command surface. Try the live system.",
+  path: "/",
+  image: "/og/home.png",
+});
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="relative overflow-x-clip">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: jsonLd([
+            pageSchema({
+              path: "/",
+              name: "Flow State — AI systems that put your business in flow",
+              description:
+                "Custom AI and automation systems for owner-led businesses in Sri Lanka.",
+            }),
+            {
+              "@context": "https://schema.org",
+              "@type": "FAQPage",
+              "@id": abs("/#faq"),
+              mainEntity: HOME_FAQ.map((f) => ({
+                "@type": "Question",
+                name: f.q,
+                acceptedAnswer: { "@type": "Answer", text: String(f.a) },
+              })),
+            },
+          ]),
+        }}
+      />
+      <Preloader />
+      <Nav />
+      <Hero />
+      <Manifesto />
+      <SystemSection />
+      <WhyUs />
+      <Principles />
+      <Process />
+      <Fit />
+      <FAQ items={HOME_FAQ} />
+      <CTA />
+      <Footer />
+    </main>
   );
 }

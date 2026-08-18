@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# raw design & source assets
+assets/
+logo-1
+logo.png
+public/hf_*.mp4
+public/v.mp4
+public/logo.png
+
+# local tooling / agent configurations
+.agents/
+.claude/
+skills-lock.json
