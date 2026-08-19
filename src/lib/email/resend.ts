@@ -1,14 +1,15 @@
 import "server-only";
 
 import { Resend } from "resend";
-import { RESEND_API_KEY, RESEND_READY } from "./config";
+import { RESEND_READY } from "./config";
 
 let client: Resend | null = null;
 
 /** Lazily built so importing this module never throws when the key is missing. */
 export function resend() {
-  if (!RESEND_READY) throw new Error("Resend is not configured. Set RESEND_API_KEY in .env.local");
-  client ??= new Resend(RESEND_API_KEY);
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("Resend is not configured. Set RESEND_API_KEY in .env.local");
+  client ??= new Resend(apiKey);
   return client;
 }
 

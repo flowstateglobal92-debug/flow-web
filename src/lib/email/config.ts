@@ -7,7 +7,6 @@ import "server-only";
  * receiving is a separate capability on the same domain (an MX record) or on
  * the throwaway `<id>.resend.app` address Resend hands out.
  */
-export const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
 
 export const MAILBOX_ADDRESS = process.env.EMAIL_FROM_ADDRESS || "support@flowstate.lk";
 
@@ -28,4 +27,4 @@ export const INBOX_ADDRESSES = (process.env.EMAIL_INBOX_ADDRESSES ?? "")
   .filter(Boolean);
 
 /** False until the API key is filled in — the page shows setup steps instead of failing. */
-export const RESEND_READY = Boolean(RESEND_API_KEY);
+export const RESEND_READY = Boolean(process.env.RESEND_API_KEY);
