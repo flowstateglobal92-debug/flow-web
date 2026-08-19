@@ -155,6 +155,53 @@ export const Icon = {
       <path d="M14 3v5h5M10 13h6M10 17h4" />
     </svg>
   ),
+  send: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="M21 3 10.5 13.5" />
+      <path d="M21 3 14.5 21l-4-7.5L3 9.5z" />
+    </svg>
+  ),
+  reply: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="m9 7-5 5 5 5" />
+      <path d="M4 12h9a7 7 0 0 1 7 7v1" />
+    </svg>
+  ),
+  forward: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="m15 7 5 5-5 5" />
+      <path d="M20 12h-9a7 7 0 0 0-7 7v1" />
+    </svg>
+  ),
+  paperclip: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="M20 11.5 12.2 19.3a4.5 4.5 0 0 1-6.4-6.4l8-8a3 3 0 0 1 4.2 4.2l-8 8a1.5 1.5 0 0 1-2.1-2.1l7.4-7.4" />
+    </svg>
+  ),
+  star: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="m12 3.6 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.8l5.9-.9z" />
+    </svg>
+  ),
+  archive: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+    </svg>
+  ),
+  refresh: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <path d="M20 12a8 8 0 1 1-2.6-5.9" />
+      <path d="M20 4v4h-4" />
+    </svg>
+  ),
+  image: ({ size, ...p }: IconProps) => (
+    <svg {...base(size)} {...p}>
+      <rect x="3" y="4.5" width="18" height="15" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="m4 17 4.5-4.5 3.5 3.5 3-2.5L20 17" />
+    </svg>
+  ),
 };
 
 export type AdminIcon = keyof typeof Icon;

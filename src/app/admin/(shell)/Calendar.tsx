@@ -75,12 +75,12 @@ export default function Calendar({
   const defaultStart = modal?.event
     ? toDateTimeInput(new Date(modal.event.starts_at))
     : toDateTimeInput(
-        (() => {
-          const d = modal?.date ? new Date(modal.date) : new Date();
-          d.setHours(9, 0, 0, 0);
-          return d;
-        })(),
-      );
+      (() => {
+        const d = modal?.date ? new Date(modal.date) : new Date();
+        d.setHours(9, 0, 0, 0);
+        return d;
+      })(),
+    );
 
   return (
     <>
@@ -128,9 +128,8 @@ export default function Calendar({
             return (
               <div
                 key={key}
-                className={`group relative min-h-[92px] bg-ink px-1.5 pb-1.5 pt-1 transition-colors ${
-                  isThisMonth ? "" : "opacity-40"
-                } ${isToday ? "ring-1 ring-inset ring-terra/50" : "hover:bg-cream/[0.03]"}`}
+                className={`group relative min-h-[92px] bg-ink px-1.5 pb-1.5 pt-1 transition-colors ${isThisMonth ? "" : "opacity-40"
+                  } ${isToday ? "ring-1 ring-inset ring-terra/50" : "hover:bg-cream/[0.03]"}`}
               >
                 <div className="flex items-center justify-between">
                   <span
@@ -154,9 +153,8 @@ export default function Calendar({
                       key={e.id}
                       type="button"
                       onClick={() => setModal({ mode: "edit", event: e })}
-                      className={`block w-full truncate border px-1.5 py-0.5 text-left text-[10.5px] transition-opacity ${
-                        KIND_TONE[e.kind]
-                      } ${e.done ? "opacity-45 line-through" : ""}`}
+                      className={`block w-full truncate border px-1.5 py-0.5 text-left text-[10.5px] transition-opacity ${KIND_TONE[e.kind]
+                        } ${e.done ? "opacity-45 line-through" : ""}`}
                       title={e.title}
                     >
                       {!e.all_day && (

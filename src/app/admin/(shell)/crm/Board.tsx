@@ -77,13 +77,12 @@ function LeadCard({
       {...listeners}
       {...attributes}
       onClick={onOpen}
-      className={`group relative select-none border p-3 text-left transition-[box-shadow,border-color,background-color] ${
-        overlay
+      className={`group relative select-none border p-3 text-left transition-[box-shadow,border-color,background-color] ${overlay
           ? "pointer-events-none rotate-[2deg] scale-[1.02] cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.9)] ring-1 ring-terra/50"
           : isDragging
             ? "cursor-grabbing border-dashed border-cream/20 bg-transparent opacity-30"
             : "cursor-grab border-cream/10 bg-cream/[0.035] hover:border-cream/25 hover:bg-cream/[0.06]"
-      }`}
+        }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -140,9 +139,8 @@ function Column({
   return (
     <div
       ref={setNodeRef}
-      className={`flex w-[248px] shrink-0 flex-col border p-2.5 transition-colors ${
-        isOver ? "border-terra/50 bg-terra/[0.07]" : activeDrag ? "border-cream/[0.12] bg-ink/40" : "border-cream/[0.07] bg-ink/25"
-      }`}
+      className={`flex w-[248px] shrink-0 flex-col border p-2.5 transition-colors ${isOver ? "border-terra/50 bg-terra/[0.07]" : activeDrag ? "border-cream/[0.12] bg-ink/40" : "border-cream/[0.07] bg-ink/25"
+        }`}
     >
       <div className="flex items-center justify-between gap-2 px-1 pb-2.5 pt-0.5">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -338,11 +336,10 @@ export default function Board({
                 key={f}
                 type="button"
                 onClick={() => setFilter(f)}
-                className={`border px-2.5 py-1.5 text-[11.5px] font-medium transition-all duration-300 ${
-                  filter === f
+                className={`border px-2.5 py-1.5 text-[11.5px] font-medium transition-all duration-300 ${filter === f
                     ? "border-terra/50 bg-terra/15 text-terra-bright"
                     : "border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:text-cream"
-                }`}
+                  }`}
               >
                 {f === "ALL" ? "All" : f}
               </button>

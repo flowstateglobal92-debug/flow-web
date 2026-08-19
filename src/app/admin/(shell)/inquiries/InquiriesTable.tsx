@@ -85,11 +85,10 @@ export default function InquiriesTable({
                 key={t.key}
                 type="button"
                 onClick={() => goTo({ status: String(t.key) })}
-                className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-[12px] font-medium transition-all duration-300 ${
-                  active
+                className={`inline-flex items-center gap-1.5 border px-3 py-1.5 text-[12px] font-medium transition-all duration-300 ${active
                     ? "border-terra/50 bg-terra/15 text-terra-bright"
                     : "border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:text-cream"
-                }`}
+                  }`}
               >
                 {t.label}
                 <span className="font-mono text-[10px] text-sand tabular-nums">{t.count}</span>
@@ -206,9 +205,8 @@ export default function InquiriesTable({
                   return (
                     <tr
                       key={i.id}
-                      className={`group border-b border-cream/[0.05] transition-colors last:border-0 ${
-                        isSelected ? "bg-terra/[0.06]" : "hover:bg-cream/[0.03]"
-                      }`}
+                      className={`group border-b border-cream/[0.05] transition-colors last:border-0 ${isSelected ? "bg-terra/[0.06]" : "hover:bg-cream/[0.03]"
+                        }`}
                     >
                       <td className="px-3 py-3 align-middle">
                         <input

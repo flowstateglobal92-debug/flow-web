@@ -11,6 +11,7 @@ import { signOut } from "@/app/admin/actions/auth";
 const NAV = [
   { href: "/admin", label: "Dashboard", hint: "Today at a glance", icon: Icon.dashboard },
   { href: "/admin/inquiries", label: "Inquiries", hint: "Form submissions", icon: Icon.inbox },
+  { href: "/admin/email", label: "Email", hint: "", icon: Icon.mail },
   { href: "/admin/crm", label: "CRM", hint: "Kanban pipeline", icon: Icon.pipeline },
   { href: "/admin/expenses", label: "Expenses", hint: "Income & profit", icon: Icon.ledger },
 ] as const;
@@ -20,16 +21,25 @@ export default function Shell({
   name,
   email,
   newInquiries = 0,
+  unreadMail = 0,
+  mailbox = "",
 }: {
   children: ReactNode;
   name: string;
   email: string;
   newInquiries?: number;
+  unreadMail?: number;
+  /** Address the mailbox sends and receives on — shown under the Email rail. */
+  mailbox?: string;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   const isActive = (href: string) => (href === "/admin" ? pathname === "/admin" : pathname.startsWith(href));
+
+  /** Only two rails carry a count, and both mean "unopened". */
+  const countFor = (href: string) =>
+    href === "/admin/inquiries" ? newInquiries : href === "/admin/email" ? unreadMail : 0;
 
   const nav = (
     <nav className="flex flex-col gap-1" aria-label="Admin">
@@ -40,11 +50,10 @@ export default function Shell({
             key={item.href}
             href={item.href}
             onClick={() => setOpen(false)}
-            className={`group relative flex items-center gap-3 border px-3 py-2.5 transition-all duration-300 ${
-              active
+            className={`group relative flex items-center gap-3 border px-3 py-2.5 transition-all duration-300 ${active
                 ? "border-terra/40 bg-terra/[0.10] text-cream"
                 : "border-transparent text-sand hover:border-cream/12 hover:bg-cream/[0.04] hover:text-cream"
-            }`}
+              }`}
           >
             <span
               className={`absolute inset-y-0 left-0 w-px transition-colors ${active ? "bg-terra" : "bg-transparent"}`}
@@ -55,11 +64,13 @@ export default function Shell({
             </span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-medium leading-tight">{item.label}</span>
-              <span className="block text-[10.5px] text-sand/80">{item.hint}</span>
+              <span className="block text-[10.5px] text-sand/80">
+                {item.href === "/admin/email" ? mailbox || "Inbox & sent" : item.hint}
+              </span>
             </span>
-            {item.href === "/admin/inquiries" && newInquiries > 0 && (
+            {countFor(item.href) > 0 && (
               <span className="shrink-0 bg-terra px-1.5 py-0.5 font-mono text-[10px] font-medium text-cream tabular-nums">
-                {newInquiries}
+                {countFor(item.href)}
               </span>
             )}
           </Link>

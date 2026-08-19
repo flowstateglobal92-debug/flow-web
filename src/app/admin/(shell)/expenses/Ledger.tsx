@@ -116,11 +116,10 @@ export default function Ledger({
               key={t.key}
               type="button"
               onClick={() => goTo({ kind: t.key })}
-              className={`border px-3 py-1.5 text-[12px] font-medium transition-all duration-300 ${
-                kind === t.key
+              className={`border px-3 py-1.5 text-[12px] font-medium transition-all duration-300 ${kind === t.key
                   ? "border-terra/50 bg-terra/15 text-terra-bright"
                   : "border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:text-cream"
-              }`}
+                }`}
             >
               {t.label}
             </button>
@@ -206,9 +205,8 @@ export default function Ledger({
                         </td>
                         <td className="px-3 py-3 text-[11.5px] text-sand">{e.method ?? "—"}</td>
                         <td
-                          className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12.5px] tabular-nums ${
-                            isIncome ? "text-emerald-300" : "text-rose-300"
-                          }`}
+                          className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12.5px] tabular-nums ${isIncome ? "text-emerald-300" : "text-rose-300"
+                            }`}
                         >
                           {isIncome ? "+" : "−"}
                           {money(Math.abs(signed)).replace("−", "")}
@@ -246,9 +244,8 @@ export default function Ledger({
                       {month === "all" ? "All time" : monthLabel(month)} · net
                     </td>
                     <td
-                      className={`px-3 py-3 text-right font-mono text-[13px] font-medium tabular-nums ${
-                        shown.profit < 0 ? "text-rose-300" : "text-emerald-300"
-                      }`}
+                      className={`px-3 py-3 text-right font-mono text-[13px] font-medium tabular-nums ${shown.profit < 0 ? "text-rose-300" : "text-emerald-300"
+                        }`}
                     >
                       {money(shown.profit)}
                     </td>
@@ -317,13 +314,12 @@ export default function Ledger({
                 key={k}
                 type="button"
                 onClick={() => setFormKind(k)}
-                className={`border px-3 py-2 text-[12.5px] font-medium capitalize transition-all duration-300 ${
-                  formKind === k
+                className={`border px-3 py-2 text-[12.5px] font-medium capitalize transition-all duration-300 ${formKind === k
                     ? k === "income"
                       ? "border-emerald-300/50 bg-emerald-400/10 text-emerald-200"
                       : "border-terra/50 bg-terra/15 text-terra-bright"
                     : "border-cream/12 bg-cream/[0.03] text-sand hover:text-cream"
-                }`}
+                  }`}
               >
                 {k}
               </button>

@@ -37,9 +37,8 @@ export function useAction() {
   const node: ReactNode = toast ? (
     <div
       role="status"
-      className={`rise-in fixed bottom-5 right-5 z-[120] max-w-[min(360px,90vw)] border px-4 py-2.5 text-[12.5px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] ${
-        toast.tone === "ok" ? "border-terra/40 bg-ink-2 text-cream" : "border-rose-400/40 bg-ink-2 text-rose-200"
-      }`}
+      className={`rise-in fixed bottom-5 right-5 z-[120] max-w-[min(360px,90vw)] border px-4 py-2.5 text-[12.5px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] ${toast.tone === "ok" ? "border-terra/40 bg-ink-2 text-cream" : "border-rose-400/40 bg-ink-2 text-rose-200"
+        }`}
     >
       {toast.text}
     </div>
