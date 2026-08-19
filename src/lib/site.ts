@@ -7,7 +7,12 @@ import type { Metadata } from "next";
 export const SITE = {
   name: "Flow State",
   legalName: "Flow State",
-  url: "https://flowstate.lk",
+  /**
+   * Canonical host. The apex 301s here, so every canonical, OG URL and sitemap
+   * entry has to name `www` — pointing them at the redirect makes search
+   * engines resolve a hop to reach the page they were told is canonical.
+   */
+  url: "https://www.flowstate.lk",
   locale: "en_LK",
   email: "support@flowstate.lk",
   /** Phone intentionally omitted until the number is confirmed. */
@@ -61,7 +66,7 @@ export function pageMeta({
       title,
       description,
       locale: SITE.locale,
-      images: [{ url: image, width: 1200, height: 630, alt: `${SITE.name} — ${title}` }],
+      images: [{ url: image, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: "summary_large_image",
@@ -88,9 +93,9 @@ export function organizationSchema() {
         logo: {
           "@type": "ImageObject",
           "@id": abs("/#logo"),
-          url: abs("/brand/mark-256.png"),
-          width: 250,
-          height: 256,
+          url: abs("/brand/icon-512.png"),
+          width: 512,
+          height: 512,
         },
         image: abs("/og/default.png"),
         address: {

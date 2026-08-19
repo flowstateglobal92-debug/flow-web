@@ -76,13 +76,10 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
-  icons: {
-    icon: [
-      { url: "/brand/mark-256.png", type: "image/png", sizes: "250x256" },
-      { url: "/favicon.ico", sizes: "any" },
-    ],
-    apple: [{ url: "/brand/mark-256.png", sizes: "180x180" }],
-  },
+  // Icons come from the file conventions in src/app — favicon.ico, icon.png
+  // and apple-icon.png. Next reads each file's real dimensions, so the `sizes`
+  // it emits can't drift out of step with the artwork the way a hand-written
+  // list does.
   formatDetection: { telephone: false, address: false, email: false },
 };
 
