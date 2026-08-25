@@ -15,7 +15,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { sleep, useOS } from "../OSContext";
+import { sleep, useOSLog } from "../OSContext";
 import { Avatar, GhostButton, Icon, Pill, PrimaryButton, ScoreBadge, type Score } from "../ui";
 
 /* ───────────── Data ───────────── */
@@ -189,7 +189,7 @@ function Column({
 
 /* ───────────── Module ───────────── */
 export default function Pipeline() {
-  const { log } = useOS();
+  const log = useOSLog();
   const [mounted, setMounted] = useState(false);
   const [leads, setLeads] = useState<Lead[]>(INITIAL);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -337,7 +337,7 @@ export default function Pipeline() {
           onDragEnd={onDragEnd}
         >
           <div
-            className="scroll-thin scroll-x -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2 touch-pan-x"
+            className="scroll-thin scroll-x -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-2 [touch-action:pan-x_pan-y]"
             data-lenis-prevent
           >
             {STAGES.map((s) => (

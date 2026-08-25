@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
   // The framework and its version are nobody else's business.
   poweredByHeader: false,
 
+  images: {
+    // Default is WebP only. AVIF lands ~30% smaller at the same quality and
+    // next/image negotiates per request, so anything that can't take it still
+    // gets the WebP.
+    formats: ["image/avif", "image/webp"],
+  },
+
   experimental: {
     serverActions: {
       // Outgoing mail carries its attachments through the Server Action body.

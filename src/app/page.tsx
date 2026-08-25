@@ -1,3 +1,4 @@
+import ReactDOM from "react-dom";
 import Nav from "@/components/Nav";
 import Preloader from "@/components/Preloader";
 import Hero from "@/components/hero/Hero";
@@ -49,6 +50,10 @@ export const metadata = pageMeta({
 });
 
 export default function Home() {
+  // The hero art is the LCP element here and nowhere else. React hoists this
+  // into <head>, so it is still discovered before the body is parsed.
+  ReactDOM.preload("/art/hero-bg.webp", { as: "image", fetchPriority: "high" });
+
   return (
     <main className="relative overflow-x-clip">
       <script

@@ -100,12 +100,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <head>
-        {/* The hero art is the LCP element on the home page. */}
-        <link rel="preload" as="image" href="/art/hero-bg.webp" fetchPriority="high" />
         {/* Runs before the first paint — and before <body> is parsed — so the
             intro veil covers the home page from frame one rather than appearing
-            once hydration reaches the preloader. Kept after the preload above so
-            the LCP hint is still discovered first. */}
+            once hydration reaches the preloader. The home page's own LCP
+            preload is issued from `app/page.tsx`, which React hoists into this
+            head ahead of the script. */}
         <script dangerouslySetInnerHTML={{ __html: INTRO_BOOT_SCRIPT }} />
         <script
           type="application/ld+json"

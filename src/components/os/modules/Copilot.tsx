@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useOS } from "../OSContext";
+import { useOSLog } from "../OSContext";
 import { Avatar, GhostButton, Icon, Pill, PrimaryButton, ScoreBadge } from "../ui";
 
 /* ───────────── Data ───────────── */
@@ -113,19 +113,31 @@ function Typewriter({ text, onDone }: { text: string; onDone: () => void }) {
   }, [onDone]);
 
   useEffect(() => {
-    // Reduced motion: reveal the whole line on the first tick instead of char by char.
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const step = reduce ? text.length : 1;
-    let i = 0;
-    const id = window.setInterval(() => {
-      i = Math.min(text.length, i + step);
+    // Reduced motion: reveal the whole line at once instead of char by char.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Async, as the interval was — `onDone` advances the parent's script.
+      const id = setTimeout(() => {
+        setN(text.length);
+        doneRef.current();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+    // Same ~71 characters a second the 14ms interval produced, off the frame
+    // clock — one render per frame rather than four.
+    const CPS = 1000 / 14;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const i = Math.min(text.length, Math.round(((now - start) / 1000) * CPS));
       setN(i);
       if (i >= text.length) {
-        window.clearInterval(id);
         doneRef.current();
+        return;
       }
-    }, reduce ? 0 : 14);
-    return () => window.clearInterval(id);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [text]);
 
   const done = n >= text.length;
@@ -176,7 +188,7 @@ function ActionCard({
 }: {
   card: Card;
   onUpdate: (c: Card) => void;
-  onLog: ReturnType<typeof useOS>["log"];
+  onLog: ReturnType<typeof useOSLog>;
 }) {
   if (card.kind === "priorities") {
     const allDone = card.done.every(Boolean);
@@ -406,7 +418,7 @@ function ActionCard({
 
 /* ───────────── Module ───────────── */
 export default function Copilot() {
-  const { log } = useOS();
+  const log = useOSLog();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [thinking, setThinking] = useState(false);

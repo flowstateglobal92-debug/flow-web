@@ -208,6 +208,7 @@ export default function RevenueCycle() {
   const pin = motionOk && wide;
 
   const [active, setActive] = useState(-1);
+  const activeRef = useRef(-1);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [videoReady, setVideoReady] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
@@ -265,22 +266,59 @@ export default function RevenueCycle() {
         ultra-fluid, high-responsiveness playback ─────── */
   useEffect(() => {
     if (!motionOk) return;
+    // Every write to `currentTime` is a decode on the main thread. At 60/s on a
+    // phone that alone ate the frame budget for the whole section, and most of
+    // those seeks landed inside the same source frame anyway. Coarse pointers
+    // get 15 seeks a second, and the easing constant is recomputed from real
+    // elapsed time so the playhead still tracks the scroll at the same rate.
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const minGapMs = coarse ? 1000 / 15 : 0;
+    const minStep = coarse ? 1 / 30 : 0; // one source frame
+    let seekAt = 0;
+
     const tick = () => {
       const v = videoEl.current;
       if (!v || v.readyState < 2) return;
       const target = targetT.current;
-      let cur = currentT.current;
-      const diff = target - cur;
+      const cur0 = currentT.current;
+      const diff = target - cur0;
       if (Math.abs(diff) < 0.001) return;
-      
+
+      const now = performance.now();
+      if (now - seekAt < minGapMs) return;
+      const frames = seekAt ? Math.min(8, ((now - seekAt) / 1000) * 60) : gsap.ticker.deltaRatio(60);
+
       // High-speed fluid interpolation: tracks scroll immediately without lag
-      const k = 1 - Math.pow(0.1, gsap.ticker.deltaRatio(60));
-      cur = Math.abs(diff) < 0.006 ? target : cur + diff * k;
+      const k = 1 - Math.pow(0.1, frames);
+      const cur = Math.abs(diff) < 0.006 ? target : cur0 + diff * k;
+      if (Math.abs(cur - cur0) < minStep) return;
+
+      seekAt = now;
       currentT.current = cur;
       v.currentTime = cur;
     };
-    gsap.ticker.add(tick);
-    return () => gsap.ticker.remove(tick);
+    // …and the ticker itself only runs while the section is anywhere near the
+    // viewport. It used to hold GSAP's rAF loop open for the whole page.
+    const stage = stageEl.current;
+    if (!stage) {
+      gsap.ticker.add(tick);
+      return () => gsap.ticker.remove(tick);
+    }
+    let added = false;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting === added) return;
+        added = e.isIntersecting;
+        if (added) gsap.ticker.add(tick);
+        else gsap.ticker.remove(tick);
+      },
+      { rootMargin: "300px 0px" },
+    );
+    io.observe(stage);
+    return () => {
+      io.disconnect();
+      gsap.ticker.remove(tick);
+    };
   }, [motionOk]);
 
   /* ── Geometry: fit the frame to the stage, place the node labels ─────── */
@@ -342,7 +380,13 @@ export default function RevenueCycle() {
         if (!t) return;
         const y = self.scroll();
         targetT.current = timeAt(t, y);
-        setActive(activeAt(t, y));
+        // `activeAt` returns an integer step, so React only needs to hear about
+        // it when the step actually changes — not on every scroll frame.
+        const next = activeAt(t, y);
+        if (next !== activeRef.current) {
+          activeRef.current = next;
+          setActive(next);
+        }
       };
 
       if (pin) {

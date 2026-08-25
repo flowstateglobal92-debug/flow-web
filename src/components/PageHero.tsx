@@ -40,12 +40,29 @@ export default function PageHero({
   id = "top",
 }: Props) {
   const root = useRef<HTMLElement>(null);
+  const videoEl = useRef<HTMLVideoElement>(null);
   const [motionOk, setMotionOk] = useState(true);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- media preference is only knowable on the client
     setMotionOk(!window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }, []);
+
+  // A looping hero video kept decoding for the whole page once you had scrolled
+  // past it. Same gate FooterBackdrop already uses.
+  useEffect(() => {
+    const v = videoEl.current;
+    if (!v) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e.isIntersecting) void v.play().catch(() => {});
+        else v.pause();
+      },
+      { rootMargin: "150px 0px" },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, [motionOk]);
 
   useGSAP(
     () => {
@@ -120,6 +137,7 @@ export default function PageHero({
           />
           {video && motionOk && (
             <video
+              ref={videoEl}
               className="absolute inset-0 h-full w-full object-cover animate-[rise-in_1.6s_ease-out_both]"
               style={{ objectPosition: image.focus ?? "70% 50%" }}
               src={video.src}

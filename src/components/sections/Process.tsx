@@ -141,6 +141,29 @@ export default function Process() {
         gsap.set([path, glow], { strokeDasharray: len, strokeDashoffset: len });
         gsap.set(comet.current, { autoAlpha: 0 });
 
+        // `getPointAtLength` walks the path's segment table on every call, and
+        // this used to run once per scroll frame. The rail only changes shape
+        // on resize, so sample it once here and interpolate instead — at ~5px
+        // spacing on a gentle bezier the error is well under a pixel.
+        const SAMPLES = 300;
+        const pts = new Float32Array((SAMPLES + 1) * 2);
+        for (let i = 0; i <= SAMPLES; i++) {
+          const pt = path.getPointAtLength((len * i) / SAMPLES);
+          pts[i * 2] = pt.x;
+          pts[i * 2 + 1] = pt.y;
+        }
+        const sampleAt = (p: number) => {
+          const f = Math.min(SAMPLES, Math.max(0, p * SAMPLES));
+          const i0 = Math.min(SAMPLES - 1, Math.floor(f));
+          const w = f - i0;
+          const ax = pts[i0 * 2];
+          const ay = pts[i0 * 2 + 1];
+          return {
+            x: ax + (pts[i0 * 2 + 2] - ax) * w,
+            y: ay + (pts[i0 * 2 + 3] - ay) * w,
+          };
+        };
+
         const st = ScrollTrigger.create({
           trigger: list.current,
           start: "top 68%",
@@ -153,7 +176,7 @@ export default function Process() {
             gsap.set([path, glow], { strokeDashoffset: len - drawn });
 
             // The tip of the drawn line — the comet sits on it.
-            const pt = path.getPointAtLength(drawn);
+            const pt = sampleAt(p);
             gsap.set(comet.current, {
               x: pt.x,
               y: pt.y,
@@ -295,7 +318,9 @@ export default function Process() {
                 {/* Card */}
                 <div
                   className={`col-start-2 row-start-1 transition-[opacity,transform,filter] duration-700 ease-[var(--ease-flow)] ${
-                    reached ? "translate-y-0 opacity-100 blur-0" : "translate-y-4 opacity-30 blur-[1px]"
+                    reached
+                      ? "translate-y-0 opacity-100 [@media(pointer:fine)]:blur-0"
+                      : "translate-y-4 opacity-30 [@media(pointer:fine)]:blur-[1px]"
                   } ${left ? "lg:col-start-1 lg:pr-12" : "lg:col-start-3 lg:pl-12"}`}
                 >
                   <article className="group glass spotlight relative overflow-hidden rounded-2xl p-5 transition-[border-color,box-shadow] duration-500 hover:border-cream/25 hover:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.85),0_0_0_1px_rgba(198,93,59,0.15)] sm:p-6">

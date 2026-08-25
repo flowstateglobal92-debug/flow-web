@@ -10,7 +10,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { sleep, useOS } from "../OSContext";
+import { sleep, useOSLog } from "../OSContext";
 import { Avatar, GhostButton, Icon, Pill, ScoreBadge, type Score } from "../ui";
 
 /* ───────────── Data ───────────── */
@@ -238,19 +238,33 @@ function Typewriter({ text, animate, onDone, onGrow }: { text: string; animate: 
 
   useEffect(() => {
     if (!animate) return;
-    // Reduced motion: reveal the whole message on the first tick instead of per character.
-    const step = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? text.length : 1;
-    let i = 0;
-    const id = setInterval(() => {
-      i = Math.min(text.length, i + step);
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      // Async, as the interval was — `onDone` advances the parent's script.
+      const id = setTimeout(() => {
+        setN(text.length);
+        growRef.current();
+        doneRef.current();
+      }, 0);
+      return () => clearTimeout(id);
+    }
+    // Same 83 characters a second the 12ms interval produced, but advanced from
+    // the frame clock: one render (and one scroll write) per frame instead of
+    // five, which is what made a reply land as a stutter on a phone.
+    const CPS = 1000 / 12;
+    let raf = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const i = Math.min(text.length, Math.round(((now - start) / 1000) * CPS));
       setN(i);
       growRef.current();
       if (i >= text.length) {
-        clearInterval(id);
         doneRef.current();
+        return;
       }
-    }, 12);
-    return () => clearInterval(id);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
   }, [animate, text]);
 
   const shown = animate ? text.slice(0, n) : text;
@@ -392,7 +406,7 @@ const stageDone = (s: Stage) => ({ open: 1, qualified: 2, "awaiting-slot": 3, bo
 
 /* ───────────── Module ───────────── */
 export default function Inbox() {
-  const { log } = useOS();
+  const log = useOSLog();
   const [convs, setConvs] = useState<Record<string, Conv>>(initialConvs);
   const [activeId, setActiveId] = useState<string>(SEEDS[0].id);
   const [draft, setDraft] = useState("");

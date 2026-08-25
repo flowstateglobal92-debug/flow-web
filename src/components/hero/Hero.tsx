@@ -28,6 +28,7 @@ export default function Hero() {
   const [ready, setReady] = useState(false);
   const [motionOk, setMotionOk] = useState(true);
   const [onScreen, setOnScreen] = useState(true);
+  const [fine, setFine] = useState(false);
 
   useEffect(() => {
     const coarse = window.matchMedia("(pointer: coarse)").matches;
@@ -38,6 +39,7 @@ export default function Hero() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- device capability is only knowable on the client
     setQuality(coarse || small ? 0.4 : 1);
     setMotionOk(!reduced);
+    setFine(!coarse);
     // Defer the WebGL canvas one frame so the copy paints first.
     const id = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(id);
@@ -53,8 +55,25 @@ export default function Hero() {
     return () => io.disconnect();
   }, []);
 
+  // The cursor lens is a mouse affordance: on a touch screen this only fired
+  // mid-drag, and it took a forced layout read with it on every event. The rect
+  // is cached and only re-measured after something could have moved the hero.
+  const rect = useRef<DOMRect | null>(null);
+  useEffect(() => {
+    if (!fine) return;
+    const invalidate = () => {
+      rect.current = null;
+    };
+    window.addEventListener("scroll", invalidate, { passive: true });
+    window.addEventListener("resize", invalidate);
+    return () => {
+      window.removeEventListener("scroll", invalidate);
+      window.removeEventListener("resize", invalidate);
+    };
+  }, [fine]);
+
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
-    const r = e.currentTarget.getBoundingClientRect();
+    const r = (rect.current ??= e.currentTarget.getBoundingClientRect());
     mouse.current = {
       x: (e.clientX - r.left) / r.width,
       y: 1 - (e.clientY - r.top) / r.height, // GL space: y up
@@ -129,7 +148,7 @@ export default function Hero() {
     <section
       id="top"
       ref={root}
-      onPointerMove={onPointerMove}
+      onPointerMove={fine ? onPointerMove : undefined}
       className="relative isolate flex min-h-[100svh] flex-col justify-end overflow-hidden pb-8 pt-[calc(var(--nav-h)+1.5rem)] sm:pb-14 sm:pt-[calc(var(--nav-h)+2rem)]"
     >
       {/* Animated backdrop */}

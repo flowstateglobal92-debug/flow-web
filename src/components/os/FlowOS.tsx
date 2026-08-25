@@ -1,34 +1,50 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { OSProvider, useOS, type ModuleId } from "./OSContext";
+import dynamic from "next/dynamic";
+import { memo, useEffect, useRef, useState } from "react";
+import { OSProvider, useOSFeed, useOSNav, type ModuleId } from "./OSContext";
 import { Icon, MODULE_META } from "./ui";
 import Pipeline from "./modules/Pipeline";
-import Inbox from "./modules/Inbox";
-import Automations from "./modules/Automations";
-import Finance from "./modules/Finance";
-import Copilot from "./modules/Copilot";
 
 const ORDER: ModuleId[] = ["pipeline", "inbox", "automations", "finance", "copilot"];
 
-const MODULES: Record<ModuleId, () => React.JSX.Element> = {
+/**
+ * Pipeline is the module that renders on arrival, so it stays a static import
+ * and keeps server-rendering — the section's markup and height are unchanged.
+ * The other four were ~2,800 lines of client code shipped to every visitor to
+ * render nothing. They are code-split and prefetched the moment a pointer or
+ * focus lands on their sidebar button, so switching still feels instant.
+ */
+const LAZY = {
+  inbox: () => import("./modules/Inbox"),
+  automations: () => import("./modules/Automations"),
+  finance: () => import("./modules/Finance"),
+  copilot: () => import("./modules/Copilot"),
+} as const;
+
+const MODULES: Record<ModuleId, React.ComponentType> = {
   pipeline: Pipeline,
-  inbox: Inbox,
-  automations: Automations,
-  finance: Finance,
-  copilot: Copilot,
+  inbox: dynamic(LAZY.inbox),
+  automations: dynamic(LAZY.automations),
+  finance: dynamic(LAZY.finance),
+  copilot: dynamic(LAZY.copilot),
 };
 
-function TitleBar() {
-  const { counters } = useOS();
+const prefetch = (id: ModuleId) => {
+  if (id in LAZY) void LAZY[id as keyof typeof LAZY]();
+};
+
+function TitleBar({ live }: { live: boolean }) {
+  const { counters } = useOSFeed();
   const [time, setTime] = useState("");
   useEffect(() => {
+    if (!live) return;
     const tick = () =>
       setTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
     tick();
     const id = setInterval(tick, 15_000);
     return () => clearInterval(id);
-  }, []);
+  }, [live]);
 
   return (
     <div className="flex items-center justify-between gap-3 border-b border-cream/10 px-3 py-2.5 sm:gap-4 sm:px-5 sm:py-3">
@@ -64,7 +80,8 @@ function TitleBar() {
 }
 
 function Sidebar() {
-  const { module, setModule, counters } = useOS();
+  const { module, setModule } = useOSNav();
+  const { counters } = useOSFeed();
   return (
     <aside className="scroll-x-fade flex flex-col border-b border-cream/10 lg:border-b-0 lg:border-r">
       {/* Horizontal on mobile, vertical on desktop */}
@@ -82,6 +99,8 @@ function Sidebar() {
               key={id}
               type="button"
               onClick={() => setModule(id)}
+              onPointerEnter={() => prefetch(id)}
+              onFocus={() => prefetch(id)}
               aria-current={active ? "page" : undefined}
               className={`group relative flex shrink-0 items-center gap-3 rounded-none px-3 py-2.5 text-left transition-all lg:w-full ${
                 active ? "bg-cream/[0.07] text-cream" : "text-cream-2 hover:bg-cream/[0.04] hover:text-cream"
@@ -129,7 +148,7 @@ function Sidebar() {
 }
 
 function ActivityBar() {
-  const { events } = useOS();
+  const { events } = useOSFeed();
   const latest = events.slice(0, 4);
   return (
     <div className="flex items-center gap-4 overflow-hidden border-t border-cream/10 px-4 py-2.5 sm:px-5">
@@ -159,7 +178,7 @@ function ActivityBar() {
 }
 
 function ToastRail() {
-  const { events } = useOS();
+  const { events } = useOSFeed();
   const [visible, setVisible] = useState<number[]>([]);
   const seen = useRef<Set<number>>(new Set(events.map((e) => e.id)));
 
@@ -207,19 +226,40 @@ function ToastRail() {
   );
 }
 
-function Shell() {
-  const { module } = useOS();
+/** Memoised so the shell's own state (visibility) never re-renders the module. */
+const ModuleBody = memo(function ModuleBody({ module }: { module: ModuleId }) {
   const Active = MODULES[module];
   return (
-    <div className="relative">
+    <div key={module} className="h-full min-w-0 animate-[module-in_0.55s_var(--ease-flow)]">
+      <Active />
+    </div>
+  );
+});
+
+function Shell() {
+  const { module } = useOSNav();
+  const root = useRef<HTMLDivElement>(null);
+  const [live, setLive] = useState(false);
+  // `data-os-live` drives the CSS that parks the dashed edges, the live dots
+  // and the shimmer while the section is away; the clock reads the same flag.
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setLive(e.isIntersecting), {
+      rootMargin: "200px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div className="relative" ref={root} data-os-live={live}>
       <div className="glass glass--strong overflow-hidden rounded-none">
-        <TitleBar />
+        <TitleBar live={live} />
         <div className="grid grid-cols-1 lg:grid-cols-[224px_minmax(0,1fr)]">
           <Sidebar />
           <div className="relative min-w-0 min-h-[480px] bg-ink/30 sm:min-h-[560px] lg:min-h-[600px]">
-            <div key={module} className="h-full min-w-0 animate-[module-in_0.55s_var(--ease-flow)]">
-              <Active />
-            </div>
+            <ModuleBody module={module} />
           </div>
         </div>
         <ActivityBar />

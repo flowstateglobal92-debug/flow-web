@@ -7,6 +7,8 @@ type Facet = {
   label: string;
   title: string;
   desc: string;
+  /** Tighter copy for phones, where the full paragraph runs to seven lines. */
+  descShort: string;
   img: string;
 };
 
@@ -17,6 +19,7 @@ const FACETS: Facet[] = [
     label: "The company",
     title: "Built directly by the team you talk to",
     desc: "You work directly with the people designing and engineering your system. No account managers, no handoffs, and no layers between your business and the build.",
+    descShort: "You work directly with the people who design and engineer your system — no account managers, no handoffs.",
     img: "/art/ic-designer.webp",
   },
   {
@@ -24,6 +27,7 @@ const FACETS: Facet[] = [
     label: "The craft",
     title: "Systems designed, not software licensed",
     desc: "We don't resell a product. Every build starts from your pipeline, your language and your approvals — and ships as one operating layer that is yours.",
+    descShort: "We don't resell a product. Every build starts from your pipeline and ships as one operating layer that is yours.",
     img: "/art/ic-blueprint.webp",
   },
   {
@@ -31,6 +35,7 @@ const FACETS: Facet[] = [
     label: "The ground",
     title: "Built for how business runs here",
     desc: "A Sri Lankan company. WhatsApp-first selling, three languages, instalments and cheque cycles are in the foundations — not bolted on later.",
+    descShort: "A Sri Lankan company. WhatsApp-first selling, three languages and cheque cycles are in the foundations.",
     img: "/art/ic-map.webp",
   },
 ];
@@ -75,9 +80,20 @@ export default function Manifesto() {
             {FACETS.map((f, i) => (
               <li key={f.n} data-facet>
                 <article className="group glass spotlight relative overflow-hidden rounded-2xl p-6 transition-[transform,border-color,box-shadow] duration-500 ease-[var(--ease-flow)] hover:-translate-y-1 hover:border-cream/25 hover:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.85),0_0_0_1px_rgba(198,93,59,0.15)] sm:p-7">
-                  {/* Glass object */}
+                  <div className="relative sm:max-w-[calc(100%-136px)]">
+                    <p className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-terra-bright">
+                      {f.n} · {f.label}
+                    </p>
+                    <h3 className="font-display mt-2 text-xl font-medium leading-tight text-cream sm:text-2xl">
+                      {f.title}
+                    </h3>
+                  </div>
+
+                  {/* Glass object — in flow under the heading on phones, where a
+                      column narrow enough to wrap around it left the copy at
+                      seven lines; floated beside the copy from `sm` up. */}
                   <div
-                    className="pointer-events-none absolute -right-2 top-1/2 w-[86px] -translate-y-1/2 sm:right-2 sm:w-[124px]"
+                    className="pointer-events-none relative mt-5 w-[104px] sm:absolute sm:right-2 sm:top-1/2 sm:mt-0 sm:w-[124px] sm:-translate-y-1/2"
                     aria-hidden
                   >
                     <div className="glow-terra absolute left-1/2 top-1/2 h-[85%] w-[85%] -translate-x-1/2 -translate-y-1/2 opacity-40 transition-opacity duration-500 group-hover:opacity-70" />
@@ -86,21 +102,16 @@ export default function Manifesto() {
                       alt=""
                       width={800}
                       height={800}
-                      sizes="124px"
+                      sizes="(min-width: 640px) 124px, 104px"
                       className="float-y relative h-auto w-full object-contain drop-shadow-[0_16px_32px_rgba(0,0,0,0.6)] transition-transform duration-700 ease-[var(--ease-flow)] group-hover:scale-[1.06]"
                       style={{ animationDelay: `${i * -1.9}s` }}
                     />
                   </div>
 
-                  <div className="relative max-w-[calc(100%-82px)] sm:max-w-[calc(100%-136px)]">
-                    <p className="font-mono text-[10.5px] uppercase tracking-[0.2em] text-terra-bright">
-                      {f.n} · {f.label}
-                    </p>
-                    <h3 className="font-display mt-2 text-xl font-medium leading-tight text-cream sm:text-2xl">
-                      {f.title}
-                    </h3>
-                    <p className="mt-2.5 text-pretty text-[13.5px] leading-relaxed text-cream-2">{f.desc}</p>
-                  </div>
+                  <p className="relative mt-4 text-pretty text-[13.5px] leading-relaxed text-cream-2 sm:mt-2.5 sm:max-w-[calc(100%-136px)]">
+                    <span className="sm:hidden">{f.descShort}</span>
+                    <span className="hidden sm:inline">{f.desc}</span>
+                  </p>
                 </article>
               </li>
             ))}

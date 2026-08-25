@@ -174,6 +174,12 @@ function CapCard({ cap, dim }: { cap: Cap; dim: boolean }) {
 
   const onMove = useCallback(
     (e: PointerEvent<HTMLDivElement>) => {
+      // `.spotlight::after` only lights up on `:hover`, which is itself gated to
+      // fine pointers — so on a touch screen these writes fed a 420px radial
+      // gradient nothing would ever show. The tilt was already gated behind
+      // `tilt`; the custom-property writes were not, so a finger dragged across
+      // a card still repainted it.
+      if (!tilt) return;
       const node = el.current;
       if (!node) return;
       const r = node.getBoundingClientRect();
@@ -181,18 +187,17 @@ function CapCard({ cap, dim }: { cap: Cap; dim: boolean }) {
       const py = (e.clientY - r.top) / r.height;
       node.style.setProperty("--mx", `${px * 100}%`);
       node.style.setProperty("--my", `${py * 100}%`);
-      if (tilt) {
-        const rx = (0.5 - py) * 7;
-        const ry = (px - 0.5) * 8;
-        node.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-3px)`;
-      }
+      const rx = (0.5 - py) * 7;
+      const ry = (px - 0.5) * 8;
+      node.style.transform = `perspective(1100px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-3px)`;
     },
     [tilt],
   );
 
   const onLeave = useCallback(() => {
     const node = el.current;
-    if (node) node.style.transform = "";
+    if (!node) return;
+    node.style.transform = "";
   }, []);
 
   return (
@@ -201,8 +206,8 @@ function CapCard({ cap, dim }: { cap: Cap; dim: boolean }) {
     <article data-cap className={`relative ${cap.span ? "lg:col-span-2" : ""}`}>
       <div
         ref={el}
-        onPointerMove={onMove}
-        onPointerLeave={onLeave}
+        onPointerMove={tilt ? onMove : undefined}
+        onPointerLeave={tilt ? onLeave : undefined}
         className={`glass spotlight group relative flex h-full min-h-[300px] flex-col overflow-hidden rounded-[26px] p-6 transition-[transform,opacity,filter] duration-500 ease-[var(--ease-flow)] will-change-transform sm:p-7 ${
           dim
             ? "pointer-events-none opacity-30 saturate-50 lg:scale-[0.985]"

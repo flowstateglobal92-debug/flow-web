@@ -226,27 +226,31 @@ export default function LiquidWordmark({
     ro.observe(canvas);
     resize();
 
-    // Pointer → gentle global tilt, eased.
+    // Pointer → gentle global tilt, eased. A window-level listener, so it is
+    // scoped to real cursors: on touch it only ever fired mid-drag, on every
+    // page that mounts a wordmark.
     let tiltTarget = 0;
     let tilt = 0;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
     const onMove = (e: PointerEvent) => {
       tiltTarget = ((e.clientX / window.innerWidth) - 0.5) * 0.18;
     };
-    window.addEventListener("pointermove", onMove, { passive: true });
+    if (!coarse) window.addEventListener("pointermove", onMove, { passive: true });
 
-    // Only animate while visible.
-    let visible = true;
-    const io = new IntersectionObserver(([en]) => {
-      visible = en.isIntersecting;
-    });
-    io.observe(canvas);
+    // The wordmark sits under three chained drop-shadows, which the browser has
+    // to re-run over the canvas on every frame it draws — so on phones half the
+    // frames is also half that filter work.
+    const minFrameMs = coarse ? 1000 / 30 - 2 : 0;
 
     let raf = 0;
     let last = performance.now();
+    let drawnAt = 0;
     const start = last;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      if (!visible || document.hidden || !loaded) return;
+      if (document.hidden || !loaded) return;
+      if (now - drawnAt < minFrameMs) return;
+      drawnAt = now;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       tilt += (tiltTarget - tilt) * Math.min(1, dt * 2.5);
@@ -258,11 +262,28 @@ export default function LiquidWordmark({
       ctx.uniform1f(uAgit, 1 - fill);
       ctx.drawArrays(ctx.TRIANGLE_STRIP, 0, 4);
     };
-    raf = requestAnimationFrame(frame);
+
+    // Only animate while visible — and stop *scheduling* frames too, rather
+    // than waking every 16ms to decide there is nothing to draw.
+    const start_ = () => {
+      if (!raf) {
+        last = performance.now();
+        raf = requestAnimationFrame(frame);
+      }
+    };
+    const stop = () => {
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+    };
+    const io = new IntersectionObserver(([en]) => (en.isIntersecting ? start_() : stop()));
+    io.observe(canvas);
+    start_();
 
     return () => {
       offReveal();
-      cancelAnimationFrame(raf);
+      stop();
       ro.disconnect();
       io.disconnect();
       window.removeEventListener("pointermove", onMove);

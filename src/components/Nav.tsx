@@ -71,22 +71,26 @@ export default function Nav() {
         <Link href="/" className="group flex items-center gap-2.5 pl-1 sm:gap-3" aria-label="Flow State — home">
           <span data-nav-mark className="relative block h-9 w-9 transition-opacity duration-500 sm:h-11 sm:w-11">
             <span className="absolute inset-0 rounded-full bg-terra/40 blur-lg opacity-0 transition-opacity group-hover:opacity-100" />
+            {/* WebP, not the 542KB PNG: same artwork at 35KB, and the same
+                source the footer already uses. `loading="eager"` rather than
+                `priority` — these fetch immediately but must not emit preload
+                hints that race the hero art for the LCP. */}
             <Image
-              src="/brand/mark.png"
+              src="/brand/mark-256.webp"
               alt="Flow State"
-              width={598}
-              height={612}
-              priority
+              width={250}
+              height={256}
+              loading="eager"
               sizes="(min-width: 640px) 44px, 36px"
               className="relative h-9 w-auto object-contain sm:h-11"
             />
           </span>
           <Image
-            src="/brand/wordmark.png"
+            src="/brand/wordmark.webp"
             alt=""
-            width={863}
-            height={153}
-            priority
+            width={400}
+            height={71}
+            loading="eager"
             sizes="150px"
             className="hidden h-[20px] w-auto opacity-90 sm:block"
           />
@@ -159,6 +163,7 @@ export default function Nav() {
           open ? "visible pointer-events-auto scale-100 opacity-100" : "invisible pointer-events-none scale-95 opacity-0"
         }`}
         data-lenis-prevent
+        data-modal
         aria-hidden={!open}
       >
         {LINKS.map((l) => {

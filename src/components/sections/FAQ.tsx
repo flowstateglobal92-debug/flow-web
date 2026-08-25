@@ -71,7 +71,10 @@ function Item({
         id={panelId}
         role="region"
         aria-labelledby={btnId}
-        className="grid grid-cols-1 transition-[grid-template-rows] duration-500 ease-[var(--ease-flow)]"
+        // `contain` keeps the 500ms row-size animation from reflowing the rest
+        // of the page on every frame of a toggle — the row still animates, the
+        // layout work just stops at the panel's own box.
+        className="grid grid-cols-1 [contain:layout_paint] transition-[grid-template-rows] duration-500 ease-[var(--ease-flow)]"
         style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
       >
         <div className="overflow-hidden">

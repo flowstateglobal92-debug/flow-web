@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { sleep, useOS } from "../OSContext";
+import { sleep, useOSLog } from "../OSContext";
 import { GhostButton, Icon, Pill, PrimaryButton } from "../ui";
 
 /* ───────────── Data ───────────── */
@@ -308,7 +308,7 @@ type LogEntry = { id: number; t: string; text: string; kind: "head" | "line" | "
 const stamp = (ms: number) => `+${(ms / 1000).toFixed(1)}s`;
 
 export default function Automations() {
-  const { log } = useOS();
+  const log = useOSLog();
   const uid = useId().replace(/:/g, "");
 
   const [selectedId, setSelectedId] = useState<string>(PLAYBOOKS[1].id);
@@ -355,11 +355,25 @@ export default function Automations() {
       setGeo((prev) => (sameGeo(prev, next) ? prev : next));
     };
     measure();
-    const ro = new ResizeObserver(measure);
+    // Six `getBoundingClientRect()` calls and a path rebuild, and the observer
+    // watches the canvas, all four node cells and the wait pill — so a single
+    // resize fired it six times. Coalesce them into one measure per frame.
+    let pending = 0;
+    const schedule = () => {
+      if (pending) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        measure();
+      });
+    };
+    const ro = new ResizeObserver(schedule);
     ro.observe(el);
     nodeEls.current.forEach((n) => n && ro.observe(n));
     if (waitRef.current) ro.observe(waitRef.current);
-    return () => ro.disconnect();
+    return () => {
+      if (pending) cancelAnimationFrame(pending);
+      ro.disconnect();
+    };
   }, [selectedId]);
 
   const pushEntry = useCallback((e: Omit<LogEntry, "id">) => {
@@ -384,6 +398,15 @@ export default function Automations() {
         return;
       }
       const len = path.getTotalLength();
+      // `getPointAtLength` walks the segment table; sample the edge once up
+      // front (these are short two-segment paths) and interpolate per frame.
+      const N = 64;
+      const pts = new Float32Array((N + 1) * 2);
+      for (let i = 0; i <= N; i++) {
+        const pt = path.getPointAtLength((len * i) / N);
+        pts[i * 2] = pt.x;
+        pts[i * 2 + 1] = pt.y;
+      }
       const start = performance.now();
       g.style.opacity = "1";
       const frame = (now: number) => {
@@ -393,8 +416,12 @@ export default function Automations() {
         }
         const t = Math.min(1, (now - start) / dur);
         const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        const p = path.getPointAtLength(e * len);
-        g.setAttribute("transform", `translate(${p.x} ${p.y})`);
+        const f = Math.min(N, Math.max(0, e * N));
+        const i0 = Math.min(N - 1, Math.floor(f));
+        const w = f - i0;
+        const x = pts[i0 * 2] + (pts[i0 * 2 + 2] - pts[i0 * 2]) * w;
+        const y = pts[i0 * 2 + 1] + (pts[i0 * 2 + 3] - pts[i0 * 2 + 1]) * w;
+        g.setAttribute("transform", `translate(${x} ${y})`);
         if (t < 1) requestAnimationFrame(frame);
         else resolve();
       };

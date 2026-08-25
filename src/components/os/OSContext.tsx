@@ -40,7 +40,16 @@ type OSState = {
   counters: Counters;
 };
 
-const Ctx = createContext<OSState | null>(null);
+/**
+ * Three contexts, not one. Every `log()` bumps `events` and `counters`, and
+ * the Pipeline orchestration alone fires five in ~3.5s — with a single context
+ * each of those re-rendered the whole OS subtree including the active module,
+ * which is the expensive half. The modules only ever want `log`, and that
+ * value never changes, so they now never re-render for someone else's event.
+ */
+const NavCtx = createContext<Pick<OSState, "module" | "setModule"> | null>(null);
+const FeedCtx = createContext<Pick<OSState, "events" | "counters"> | null>(null);
+const LogCtx = createContext<OSState["log"] | null>(null);
 
 const SEED: OSEvent[] = [
   { id: 1, module: "inbox", text: "AI rep answered inquiry from Nadia Perera", tag: "00:31", tone: "neutral", at: Date.now() - 82_000 },
@@ -60,19 +69,30 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setCounters((c) => ({ minutesSaved: c.minutesSaved + minutes, actionsRun: c.actionsRun + 1 }));
   }, []);
 
-  const value = useMemo(
-    () => ({ module, setModule, events, log, counters }),
-    [module, events, log, counters],
-  );
+  const nav = useMemo(() => ({ module, setModule }), [module]);
+  const feed = useMemo(() => ({ events, counters }), [events, counters]);
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <LogCtx.Provider value={log}>
+      <NavCtx.Provider value={nav}>
+        <FeedCtx.Provider value={feed}>{children}</FeedCtx.Provider>
+      </NavCtx.Provider>
+    </LogCtx.Provider>
+  );
 }
 
-export function useOS() {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useOS must be used inside <OSProvider>");
+function use<T>(ctx: React.Context<T | null>, name: string): T {
+  const v = useContext(ctx);
+  if (!v) throw new Error(`${name} must be used inside <OSProvider>`);
   return v;
 }
+
+/** The active module and the setter for it. */
+export const useOSNav = () => use(NavCtx, "useOSNav");
+/** The shared activity feed and the running counters. */
+export const useOSFeed = () => use(FeedCtx, "useOSFeed");
+/** Push an event into the feed. Stable for the life of the provider. */
+export const useOSLog = () => use(LogCtx, "useOSLog");
 
 /** Tiny helper for scripted sequences: await sleep(ms) inside async effects. */
 export const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));

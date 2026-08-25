@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { sleep, useOS } from "../OSContext";
+import { sleep, useOSLog } from "../OSContext";
 import { GhostButton, Icon, KPI, PanelTitle, Pill, PrimaryButton } from "../ui";
 
 /* ───────────── Data ───────────── */
@@ -146,7 +146,7 @@ function Donut({ pct }: { pct: number }) {
 
 /* ───────────── Module ───────────── */
 export default function Finance() {
-  const { log } = useOS();
+  const log = useOSLog();
   const [invoices, setInvoices] = useState<Invoice[]>(INITIAL);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cad, setCad] = useState<{ step: number; done: boolean } | null>(null);
