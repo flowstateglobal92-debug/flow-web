@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "admin:promote": "node --env-file=.env.local scripts/promote-super-admin.mjs",
+    "import:legacy": "node --env-file=.env.local scripts/import-legacy.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

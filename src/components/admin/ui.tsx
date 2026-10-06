@@ -137,7 +137,8 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export function Button({ variant = "ghost", size = "sm", className = "", children, ...rest }: ButtonProps) {
-  const sizing = size === "sm" ? "px-3 py-1.5 text-[12px]" : "px-4 py-2.5 text-[13px]";
+  // 36px tap targets on touch screens; the desktop size stays compact.
+  const sizing = size === "sm" ? "px-3 py-1.5 text-[12px] pointer-coarse:min-h-9" : "px-4 py-2.5 text-[13px]";
   const looks = {
     primary: "btn btn--primary rounded-none",
     ghost:
@@ -227,6 +228,65 @@ export function PageHead({
         {hint && <p className="mt-1.5 max-w-xl text-[12.5px] text-sand">{hint}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </div>
+  );
+}
+
+/** Square checkbox in the brand accent, with a label and optional hint. */
+export function Checkbox({
+  label,
+  hint,
+  className = "",
+  ...rest
+}: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: ReactNode; hint?: ReactNode }) {
+  return (
+    <label className={`flex cursor-pointer items-start gap-2.5 ${className}`}>
+      <input {...rest} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[#c65d3b]" />
+      <span className="min-w-0">
+        <span className="block text-[12.5px] text-cream-2">{label}</span>
+        {hint && <span className="mt-0.5 block text-[11px] leading-snug text-sand/80">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
+/** Stack of small avatars ("+2" after `max`). Names come from the team list. */
+export function AvatarStack({ names, max = 3, size = 22 }: { names: string[]; max?: number; size?: number }) {
+  if (names.length === 0) return null;
+  const shown = names.slice(0, max);
+  return (
+    <span className="inline-flex items-center" aria-label={names.join(", ")} title={names.join(", ")}>
+      {shown.map((n, i) => (
+        <span key={`${n}-${i}`} className={i ? "-ml-1.5" : ""}>
+          <Avatar name={n} size={size} />
+        </span>
+      ))}
+      {names.length > max && (
+        <span className="ml-1 font-mono text-[10px] text-sand tabular-nums">+{names.length - max}</span>
+      )}
+    </span>
+  );
+}
+
+/** A labelled setup notice, used when an integration or key is missing. */
+export function Notice({
+  tone = "warn",
+  title,
+  children,
+}: {
+  tone?: "warn" | "info" | "danger";
+  title: string;
+  children?: ReactNode;
+}) {
+  const t = {
+    warn: "border-amber-300/25 bg-amber-400/[0.07] text-amber-100",
+    info: "border-terra/30 bg-terra/[0.08] text-cream-2",
+    danger: "border-rose-400/25 bg-rose-500/[0.08] text-rose-200",
+  }[tone];
+  return (
+    <div className={`border px-3.5 py-3 text-[12.5px] ${t}`}>
+      <p className="font-medium">{title}</p>
+      {children && <div className="mt-1.5 opacity-85">{children}</div>}
     </div>
   );
 }

@@ -1,18 +1,64 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin/auth";
-import type { Score, StageTone } from "@/lib/admin/types";
-import { amount, fail, nextPosition, ok, optional, text, type ActionResult } from "./shared";
+import { authorize, type Session } from "@/lib/admin/auth";
+import { roleAllows } from "@/lib/admin/modules";
+import type { Role, Score, StageTone } from "@/lib/admin/types";
+import { amount, fail, mustAffect, nextPosition, ok, optional, text, type ActionResult } from "./shared";
 
 /* ─────────────────────────────── leads ─────────────────────────────────── */
 
+/**
+ * A lead's owner has to be an active teammate here who can open the CRM —
+ * 0012 refuses anyone else; this says so in a sentence. A blank pick means
+ * "leave it": new leads default to whoever adds them.
+ */
+async function ownerFrom(session: Session, fd: FormData) {
+  const id = text(fd, "owner_id");
+  if (!id) return undefined;
+  const { data } = await session.supabase
+    .from("profiles")
+    .select("id, role, permissions, is_active")
+    .eq("id", id)
+    .maybeSingle<{ id: string; role: Role; permissions: string[]; is_active: boolean }>();
+  if (!data || !roleAllows(data.role, data.permissions, session.profile.workspace, data.is_active, "crm")) {
+    throw new Error("Pick an owner who can open the CRM.");
+  }
+  return id;
+}
+
+/**
+ * The linked client, only when the form carries the field ("" unlinks). The
+ * id is looked up first so a lead can't point at a client nobody here can see.
+ */
+async function clientFrom(session: Session, fd: FormData) {
+  if (!fd.has("client_id")) return {};
+  const id = text(fd, "client_id");
+  if (!id) return { client_id: null };
+  const { data } = await session.supabase.from("clients").select("id").eq("id", id).maybeSingle<{ id: string }>();
+  if (!data) throw new Error("That client no longer exists.");
+  return { client_id: id };
+}
+
+const leadFields = (fd: FormData) => ({
+  name: text(fd, "name"),
+  company: optional(fd, "company"),
+  email: optional(fd, "email"),
+  phone: optional(fd, "phone"),
+  value: amount(fd, "value"),
+  score: (text(fd, "score") || "WARM") as Score,
+  source: text(fd, "source") || "manual",
+  notes: optional(fd, "notes"),
+  next_action: optional(fd, "next_action"),
+});
+
 export async function createLead(formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase, user } = await requireAdmin();
+    const session = await authorize("crm");
+    const { supabase } = session;
 
-    const name = text(formData, "name");
-    if (!name) return { ok: false, error: "A lead needs a name." };
+    const fields = leadFields(formData);
+    if (!fields.name) return { ok: false, error: "A lead needs a name." };
 
     let stageId = text(formData, "stage_id");
     if (!stageId) {
@@ -26,25 +72,26 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
       stageId = data.id;
     }
 
-    const { error } = await supabase.from("leads").insert({
-      stage_id: stageId,
-      name,
-      company: optional(formData, "company"),
-      email: optional(formData, "email"),
-      phone: optional(formData, "phone"),
-      value: amount(formData, "value"),
-      score: (text(formData, "score") || "WARM") as Score,
-      source: text(formData, "source") || "manual",
-      notes: optional(formData, "notes"),
-      next_action: optional(formData, "next_action"),
-      position: await nextPosition(supabase, stageId),
-      created_by: user.id,
-    });
+    const owner = await ownerFrom(session, formData);
+    const client = await clientFrom(session, formData);
+
+    const { data, error } = await supabase
+      .from("leads")
+      .insert({
+        ...fields,
+        ...client,
+        ...(owner && { owner_id: owner }),
+        stage_id: stageId,
+        position: await nextPosition(supabase, stageId),
+        created_by: session.user.id,
+      })
+      .select("id")
+      .single<{ id: string }>();
     if (error) throw error;
 
     revalidatePath("/admin/crm");
     revalidatePath("/admin");
-    return ok("Lead added.");
+    return ok("Lead added.", data.id);
   } catch (e) {
     return fail(e);
   }
@@ -52,29 +99,25 @@ export async function createLead(formData: FormData): Promise<ActionResult> {
 
 export async function updateLead(id: string, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
-    const name = text(formData, "name");
-    if (!name) return { ok: false, error: "A lead needs a name." };
+    const session = await authorize("crm");
+    const fields = leadFields(formData);
+    if (!fields.name) return { ok: false, error: "A lead needs a name." };
 
-    const { error } = await supabase
+    const owner = await ownerFrom(session, formData);
+    const client = await clientFrom(session, formData);
+
+    const { data, error } = await session.supabase
       .from("leads")
-      .update({
-        name,
-        company: optional(formData, "company"),
-        email: optional(formData, "email"),
-        phone: optional(formData, "phone"),
-        value: amount(formData, "value"),
-        score: (text(formData, "score") || "WARM") as Score,
-        source: text(formData, "source") || "manual",
-        notes: optional(formData, "notes"),
-        next_action: optional(formData, "next_action"),
-      })
-      .eq("id", id);
+      .update({ ...fields, ...client, ...(owner && { owner_id: owner }) })
+      .eq("id", id)
+      .select("id");
     if (error) throw error;
+    mustAffect(data);
 
     revalidatePath("/admin/crm");
     revalidatePath("/admin");
-    return ok("Lead updated.");
+    if (client.client_id) revalidatePath(`/admin/clients/${client.client_id}`);
+    return ok("Lead updated.", id);
   } catch (e) {
     return fail(e);
   }
@@ -82,9 +125,10 @@ export async function updateLead(id: string, formData: FormData): Promise<Action
 
 export async function deleteLead(id: string): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
-    const { error } = await supabase.from("leads").delete().eq("id", id);
+    const { supabase } = await authorize("crm");
+    const { data, error } = await supabase.from("leads").delete().eq("id", id).select("id");
     if (error) throw error;
+    mustAffect(data);
     revalidatePath("/admin/crm");
     revalidatePath("/admin");
     return ok("Lead removed.");
@@ -100,7 +144,7 @@ export async function deleteLead(id: string): Promise<ActionResult> {
  */
 export async function moveLead(id: string, stageId: string, index: number): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("crm");
 
     const { data: column, error: readError } = await supabase
       .from("leads")
@@ -114,8 +158,13 @@ export async function moveLead(id: string, stageId: string, index: number): Prom
     const at = Math.max(0, Math.min(index, ids.length));
     ids.splice(at, 0, id);
 
-    const { error: moveError } = await supabase.from("leads").update({ stage_id: stageId }).eq("id", id);
+    const { data: moved, error: moveError } = await supabase
+      .from("leads")
+      .update({ stage_id: stageId })
+      .eq("id", id)
+      .select("id");
     if (moveError) throw moveError;
+    mustAffect(moved);
 
     const results = await Promise.all(
       ids.map((leadId, position) => supabase.from("leads").update({ position }).eq("id", leadId)),
@@ -131,27 +180,11 @@ export async function moveLead(id: string, stageId: string, index: number): Prom
   }
 }
 
-export async function addLeadNote(leadId: string, body: string): Promise<ActionResult> {
-  try {
-    const { supabase, user } = await requireAdmin();
-    const trimmed = body.trim();
-    if (!trimmed) return { ok: false, error: "Write something first." };
-    const { error } = await supabase
-      .from("lead_activities")
-      .insert({ lead_id: leadId, kind: "note", body: trimmed, actor_id: user.id });
-    if (error) throw error;
-    revalidatePath("/admin/crm");
-    return ok("Note added.");
-  } catch (e) {
-    return fail(e);
-  }
-}
-
 /* ────────────────────────────── stages ─────────────────────────────────── */
 
 export async function createStage(formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("crm");
     const name = text(formData, "name");
     if (!name) return { ok: false, error: "Name the stage." };
 
@@ -162,17 +195,21 @@ export async function createStage(formData: FormData): Promise<ActionResult> {
       .limit(1)
       .maybeSingle<{ position: number }>();
 
-    const { error } = await supabase.from("pipeline_stages").insert({
-      name,
-      position: (last?.position ?? -1) + 1,
-      tone: (text(formData, "tone") || "cream") as StageTone,
-      is_won: formData.get("is_won") === "on",
-      is_lost: formData.get("is_lost") === "on",
-    });
+    const { data, error } = await supabase
+      .from("pipeline_stages")
+      .insert({
+        name,
+        position: (last?.position ?? -1) + 1,
+        tone: (text(formData, "tone") || "cream") as StageTone,
+        is_won: formData.get("is_won") === "on",
+        is_lost: formData.get("is_lost") === "on",
+      })
+      .select("id")
+      .single<{ id: string }>();
     if (error) throw error;
 
     revalidatePath("/admin/crm");
-    return ok("Stage added.");
+    return ok("Stage added.", data.id);
   } catch (e) {
     return fail(e);
   }
@@ -180,11 +217,11 @@ export async function createStage(formData: FormData): Promise<ActionResult> {
 
 export async function updateStage(id: string, formData: FormData): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("crm");
     const name = text(formData, "name");
     if (!name) return { ok: false, error: "Name the stage." };
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("pipeline_stages")
       .update({
         name,
@@ -192,8 +229,10 @@ export async function updateStage(id: string, formData: FormData): Promise<Actio
         is_won: formData.get("is_won") === "on",
         is_lost: formData.get("is_lost") === "on",
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select("id");
     if (error) throw error;
+    mustAffect(data);
 
     revalidatePath("/admin/crm");
     return ok("Stage updated.");
@@ -205,7 +244,7 @@ export async function updateStage(id: string, formData: FormData): Promise<Actio
 /** Deletes through the RPC so the stage's leads are rehomed in one transaction. */
 export async function deleteStage(id: string, moveTo?: string): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("crm");
     const { error } = await supabase.rpc("delete_pipeline_stage", {
       p_stage_id: id,
       p_move_to: moveTo ?? null,
@@ -221,7 +260,7 @@ export async function deleteStage(id: string, moveTo?: string): Promise<ActionRe
 /** Shift a stage one column left or right. The protected stage stays first. */
 export async function moveStage(id: string, direction: "left" | "right"): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("crm");
 
     const { data: stages, error } = await supabase
       .from("pipeline_stages")

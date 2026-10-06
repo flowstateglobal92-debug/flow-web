@@ -40,7 +40,8 @@ values
   ('Negotiation', 'negotiation', 3, 'warn',    false, false, false),
   ('Won',         'won',         4, 'success', false, true,  false),
   ('Lost',        'lost',        5, 'muted',   false, false, true)
-on conflict (slug) do nothing;
+-- No conflict target: 0008 widens slug uniqueness to (workspace, slug).
+on conflict do nothing;
 
 -- Guard the protected stage: no delete, no rename, no reposition.
 create or replace function public.guard_protected_stage()

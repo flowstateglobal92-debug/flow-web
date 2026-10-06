@@ -875,3 +875,124 @@ input[type="range"].range::-moz-range-thumb {
 [data-os-live="false"] .marquee {
   animation-play-state: paused;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Print
+   One block for every printable admin page. Invoices print on their own
+   named A4 page with no margin (the paper carries its own) and with exact
+   colours, so the terracotta edge and amount block survive "background
+   graphics: off". Reports wrap their content in `.print-plain`: dark-theme
+   colours drop to ink on white; chart fills keep theirs — inline
+   `background` styles (bars, swatches), `print:bg-*` tracks and anything
+   marked `data-print-color` — and print with "background graphics" off too.
+   Unlayered on purpose: it has to beat the utility classes.
+   ───────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  @page invoice {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #1c1410;
+    color-scheme: light;
+  }
+  .noise,
+  [data-shell-chrome],
+  .no-print {
+    display: none !important;
+  }
+
+  /* The admin wrappers are dark full-height boxes — let the paper be the page.
+     Reports too, or "background graphics: on" prints a black sheet. */
+  body:has(.invoice-sheet, .print-plain) .min-h-screen {
+    min-height: 0 !important;
+    background: transparent !important;
+  }
+  /* The shell's page gutter would push the sheet (and a report) in from the
+     paper's edge on top of @page's own margin. */
+  body:has(.invoice-sheet) main,
+  body:has(.print-plain) main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* A long invoice's later pages: the paper tint under the whole page, not
+     just under the content of its last fragment. Beats the white above. */
+  html:has(.invoice-sheet),
+  body:has(.invoice-sheet) {
+    background: #fbf7f1 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* ScaledSheet's screen-only scaling. */
+  [data-sheet-frame] {
+    height: auto !important;
+  }
+  [data-sheet-scale] {
+    position: static !important;
+    transform: none !important;
+    opacity: 1 !important;
+    width: auto !important;
+  }
+
+  .invoice-sheet {
+    page: invoice;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    box-shadow: none !important;
+    /* A hair under 297mm so an exactly-one-page invoice never spills a blank second page. */
+    min-height: 296mm !important;
+  }
+  /* The sheet is [edge stripe (aria-hidden), padded body]. The padding lives
+     on the body, so that's what each page of a long invoice has to repeat —
+     otherwise page 2 onwards prints flush against the paper's edge. */
+  .invoice-sheet > :not([aria-hidden]) {
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  /* The terracotta edge runs the full height of every page, not only as far
+     as the last page's content. ScaledSheet drops its transform in print, so
+     `fixed` here is relative to the page box. */
+  .invoice-sheet > [aria-hidden] {
+    position: fixed !important;
+  }
+  .invoice-sheet thead {
+    display: table-header-group;
+  }
+  .invoice-sheet tr {
+    break-inside: avoid;
+  }
+
+  .print-plain {
+    background: #fff !important;
+    color: #1c1410 !important;
+  }
+  .print-plain *:not([data-print-color], [style*="background"], [class*="print:bg-"]) {
+    color: inherit;
+    background-color: transparent;
+    background-image: none;
+    box-shadow: none;
+    text-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgba(28, 20, 16, 0.16);
+  }
+  .print-plain :is([data-print-color], [style*="background"], [class*="print:bg-"]) {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .print-plain thead {
+    display: table-header-group;
+  }
+  .print-plain :is(tr, li, figure, [data-print-avoid]) {
+    break-inside: avoid;
+  }
+}

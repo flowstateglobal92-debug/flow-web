@@ -88,9 +88,10 @@ on conflict (id) do nothing;
 
 -- Safety net: a database with users but no admin (e.g. the first profile was
 -- deleted) promotes its earliest profile rather than locking everyone out.
+-- 0007 renames the top role to super_admin, so either counts as "has an admin".
 update public.profiles
 set role = 'admin'
-where not exists (select 1 from public.profiles where role = 'admin')
+where not exists (select 1 from public.profiles where role in ('admin', 'super_admin'))
   and id = (select id from public.profiles order by created_at asc, id asc limit 1);
 
 -- ─────────────────────────── is_admin() ────────────────────────────────────

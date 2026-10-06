@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -15,13 +17,15 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import Modal from "@/components/admin/Modal";
+import CommentThread from "@/components/admin/comments/CommentThread";
 import { Icon } from "@/components/admin/icons";
 import { useAction } from "@/components/admin/useAction";
 import { Avatar, Badge, Button, Field, Input, Select, Textarea, fieldClass, labelClass } from "@/components/admin/ui";
-import { money, moneyShort, relativeTime } from "@/lib/admin/format";
-import type { Lead, LeadActivity, Score, Stage, StageTone } from "@/lib/admin/types";
+import { displayName, money, moneyShort, relativeTime } from "@/lib/admin/format";
+import { NEW, hrefFor } from "@/lib/admin/links";
+import type { Lead, LeadActivity, Score, Stage, StageTone, TeamMember } from "@/lib/admin/types";
+import { convertLeadToClient } from "@/app/admin/actions/clients";
 import {
-  addLeadNote,
   createLead,
   createStage,
   deleteLead,
@@ -31,6 +35,11 @@ import {
   updateLead,
   updateStage,
 } from "@/app/admin/actions/crm";
+import { LinkButton, pillClass } from "../clients/kit";
+import { clientTitle, type ClientOption } from "../clients/model";
+
+/** A lead_activities row plus who did it (stamped by 0007). */
+export type TrailEntry = LeadActivity & { actor_id: string | null };
 
 const TONE: Record<StageTone, { dot: string; text: string }> = {
   terra: { dot: "bg-terra", text: "text-terra-bright" },
@@ -40,19 +49,30 @@ const TONE: Record<StageTone, { dot: string; text: string }> = {
   muted: { dot: "bg-sand/60", text: "text-sand" },
 };
 
+/**
+ * dnd-kit starts a keyboard drag on Space or Enter by default. Enter belongs
+ * to opening the card, so only Space picks one up; Enter still drops it.
+ */
+const KEYBOARD_CODES = { start: ["Space"], cancel: ["Escape"], end: ["Space", "Enter", "Tab"] };
+
 const SCORES: Score[] = ["HOT", "WARM", "COLD"];
 const scoreTone = (s: Score): "terra" | "cream" | "muted" =>
   s === "HOT" ? "terra" : s === "WARM" ? "cream" : "muted";
+
+/** Same as displayName() in lib/admin/team, which is server-only. */
 
 /* ─────────────────────────────── card ──────────────────────────────────── */
 
 function LeadCard({
   lead,
+  owner,
   index,
   onOpen,
   overlay,
 }: {
   lead: Lead;
+  /** The owner's display name, when the lead has one. */
+  owner?: string;
   index?: number;
   onOpen?: () => void;
   overlay?: boolean;
@@ -77,6 +97,15 @@ function LeadCard({
       {...listeners}
       {...attributes}
       onClick={onOpen}
+      // Enter opens the card (Space picks it up to move — see KEYBOARD_CODES).
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !isDragging) {
+          e.preventDefault();
+          onOpen?.();
+          return;
+        }
+        listeners?.onKeyDown?.(e);
+      }}
       className={`group relative select-none border p-3 text-left transition-[box-shadow,border-color,background-color] ${overlay
           ? "pointer-events-none rotate-[2deg] scale-[1.02] cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.9)] ring-1 ring-terra/50"
           : isDragging
@@ -107,7 +136,14 @@ function LeadCard({
         <span className="shrink-0 font-mono text-[11.5px] font-medium text-cream-2 tabular-nums">
           {money(Number(lead.value))}
         </span>
-        <span className="truncate text-right text-[10.5px] text-sand">{relativeTime(lead.updated_at)}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-right text-[10.5px] text-sand">{relativeTime(lead.updated_at)}</span>
+          {owner && (
+            <span title={`Owner · ${owner}`} className="shrink-0">
+              <Avatar name={owner} size={20} />
+            </span>
+          )}
+        </span>
       </div>
 
       <span className="pointer-events-none absolute right-2 top-2 text-cream/0 transition-colors group-hover:text-cream/25">
@@ -122,12 +158,14 @@ function LeadCard({
 function Column({
   stage,
   leads,
+  ownerOf,
   onOpenLead,
   onEditStage,
   activeDrag,
 }: {
   stage: Stage;
   leads: Lead[];
+  ownerOf: (lead: Lead) => string | undefined;
   onOpenLead: (lead: Lead) => void;
   onEditStage: (stage: Stage) => void;
   activeDrag: boolean;
@@ -161,7 +199,7 @@ function Column({
             type="button"
             onClick={() => onEditStage(stage)}
             aria-label={`Stage settings for ${stage.name}`}
-            className="text-sand/70 transition-colors hover:text-cream"
+            className="-mr-1 flex h-6 w-6 items-center justify-center text-sand/70 transition-colors hover:text-cream pointer-coarse:h-9 pointer-coarse:w-9"
           >
             <Icon.edit size={12} />
           </button>
@@ -170,7 +208,7 @@ function Column({
 
       <div className="flex min-h-[120px] flex-1 flex-col gap-2">
         {leads.map((lead, i) => (
-          <LeadCard key={lead.id} lead={lead} index={i} onOpen={() => onOpenLead(lead)} />
+          <LeadCard key={lead.id} lead={lead} owner={ownerOf(lead)} index={i} onOpen={() => onOpenLead(lead)} />
         ))}
         {leads.length === 0 && (
           <div className="flex flex-1 items-center justify-center border border-dashed border-cream/[0.08] px-3 py-6 text-center text-[11px] text-sand/70">
@@ -184,15 +222,39 @@ function Column({
 
 /* ─────────────────────────────── board ─────────────────────────────────── */
 
+type LeadModal = { mode: "create" | "edit"; lead?: Lead } | null;
+
+const focused = (leads: Lead[], id: string | null): LeadModal => {
+  const lead = id ? leads.find((l) => l.id === id) : undefined;
+  return lead ? { mode: "edit", lead } : null;
+};
+
 export default function Board({
   stages: stagesProp,
   leads: leadsProp,
   activities,
+  team,
+  owners,
+  clients,
+  me,
+  can,
+  focus,
 }: {
   stages: Stage[];
   leads: Lead[];
-  activities: LeadActivity[];
+  activities: TrailEntry[];
+  /** Everyone active — names for avatars and the trail. */
+  team: TeamMember[];
+  /** Teammates who can open the CRM — the only valid owners and @mentions here. */
+  owners: TeamMember[];
+  clients: ClientOption[];
+  me: string;
+  /** `ownership` = the 0011/0012 columns (owner, client link) are in place. */
+  can: { clients: boolean; invoices: boolean; ownership: boolean };
+  /** `?lead=` — opened on load and whenever a link points here again. */
+  focus: string | null;
 }) {
+  const router = useRouter();
   const { run, pending, toast } = useAction();
 
   // Local mirror so a drop lands instantly; re-seeded whenever the server sends
@@ -213,27 +275,52 @@ export default function Board({
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Score | "ALL">("ALL");
+  const [scope, setScope] = useState<"all" | "mine">("all");
   const [search, setSearch] = useState("");
 
-  const [leadModal, setLeadModal] = useState<{ mode: "create" | "edit"; lead?: Lead } | null>(null);
+  const [leadModal, setLeadModal] = useState<LeadModal>(() => focused(leadsProp, focus));
   const [stageModal, setStageModal] = useState<{ mode: "create" | "edit"; stage?: Stage } | null>(null);
-  const [note, setNote] = useState("");
+
+  // A deep link that changes while the board is open (a notification, ⌘K) opens that lead.
+  const [seenFocus, setSeenFocus] = useState(focus);
+  if (seenFocus !== focus) {
+    setSeenFocus(focus);
+    const next = focused(leadsProp, focus);
+    if (next) setLeadModal(next);
+  }
+
+  const closeLead = useCallback(() => {
+    setLeadModal(null);
+    // Drop ?lead= so a refresh doesn't pop the lead back open.
+    if (focus) router.replace("/admin/crm", { scroll: false });
+  }, [focus, router]);
+  const closeStage = useCallback(() => setStageModal(null), []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // Long-press to drag on touch, so a swipe still scrolls the board.
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { keyboardCodes: KEYBOARD_CODES }),
+  );
+
+  const names = useMemo(() => new Map(team.map((m) => [m.id, displayName(m)])), [team]);
+  const ownerOf = useCallback((lead: Lead) => (lead.owner_id ? names.get(lead.owner_id) : undefined), [names]);
+
+  const scoped = useMemo(
+    () => (scope === "mine" ? leads.filter((l) => l.owner_id === me) : leads),
+    [leads, scope, me],
   );
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return leads.filter((l) => {
+    return scoped.filter((l) => {
       if (filter !== "ALL" && l.score !== filter) return false;
       if (!term) return true;
       return [l.name, l.company, l.email, l.phone, l.notes, l.next_action]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term));
     });
-  }, [leads, filter, search]);
+  }, [scoped, filter, search]);
 
   const byStage = useMemo(() => {
     const map = new Map<string, Lead[]>();
@@ -246,14 +333,16 @@ export default function Board({
   const activeLead = leads.find((l) => l.id === activeId) ?? null;
   const openLead = leadModal?.mode === "edit" ? leads.find((l) => l.id === leadModal.lead?.id) ?? null : null;
   const leadTrail = openLead ? activities.filter((a) => a.lead_id === openLead.id).slice(0, 12) : [];
+  const linkedClient = openLead?.client_id ? clients.find((c) => c.id === openLead.client_id) : undefined;
+  const ownerKnown = !openLead?.owner_id || owners.some((m) => m.id === openLead.owner_id);
 
   const totals = useMemo(() => {
     const open = stagesProp.filter((s) => !s.is_won && !s.is_lost).map((s) => s.id);
-    const openValue = leads.filter((l) => open.includes(l.stage_id)).reduce((a, l) => a + Number(l.value), 0);
+    const openValue = scoped.filter((l) => open.includes(l.stage_id)).reduce((a, l) => a + Number(l.value), 0);
     const wonIds = stagesProp.filter((s) => s.is_won).map((s) => s.id);
-    const wonValue = leads.filter((l) => wonIds.includes(l.stage_id)).reduce((a, l) => a + Number(l.value), 0);
+    const wonValue = scoped.filter((l) => wonIds.includes(l.stage_id)).reduce((a, l) => a + Number(l.value), 0);
     return { openValue, wonValue };
-  }, [leads, stagesProp]);
+  }, [scoped, stagesProp]);
 
   /* ── drag ── */
   const onDragEnd = (event: DragEndEvent) => {
@@ -303,7 +392,7 @@ export default function Board({
     const editing = leadModal?.mode === "edit" ? leadModal.lead?.id : null;
     run(editing ? () => updateLead(editing, fd) : () => createLead(fd), {
       onDone: (result) => {
-        if (result.ok) setLeadModal(null);
+        if (result.ok) closeLead();
       },
     });
   };
@@ -327,29 +416,30 @@ export default function Board({
           <Button variant="primary" onClick={() => setLeadModal({ mode: "create" })}>
             <Icon.plus size={13} /> Add lead
           </Button>
-          <Button onClick={() => setStageModal({ mode: "create" })}>
+          <Button onClick={() => setStageModal({ mode: "create" })} className="pointer-coarse:min-h-9">
             <Icon.plus size={13} /> New stage
           </Button>
-          <div className="ml-1 flex items-center gap-1">
+          {can.ownership && (
+            <div className="ml-1 flex items-center gap-1" role="group" aria-label="Whose leads">
+              {(["all", "mine"] as const).map((s) => (
+                <button key={s} type="button" aria-pressed={scope === s} onClick={() => setScope(s)} className={pillClass(scope === s)}>
+                  {s === "all" ? "Everyone" : "Mine"}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="ml-1 flex items-center gap-1" role="group" aria-label="Score">
             {(["ALL", ...SCORES] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFilter(f)}
-                className={`border px-2.5 py-1.5 text-[11.5px] font-medium transition-all duration-300 ${filter === f
-                    ? "border-terra/50 bg-terra/15 text-terra-bright"
-                    : "border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:text-cream"
-                  }`}
-              >
+              <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)} className={pillClass(filter === f)}>
                 {f === "ALL" ? "All" : f}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <span className="font-mono text-[11px] text-sand tabular-nums">
-            {leads.length} leads · <span className="text-cream-2">{moneyShort(totals.openValue)}</span> open ·{" "}
+            {scoped.length} leads · <span className="text-cream-2">{moneyShort(totals.openValue)}</span> open ·{" "}
             <span className="text-emerald-200">{moneyShort(totals.wonValue)}</span> won
           </span>
           <div className="relative w-full sm:w-56">
@@ -360,6 +450,7 @@ export default function Board({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search leads…"
+              aria-label="Search leads"
               className={`${fieldClass} pl-9`}
             />
           </div>
@@ -381,10 +472,8 @@ export default function Board({
               key={stage.id}
               stage={stage}
               leads={byStage.get(stage.id) ?? []}
-              onOpenLead={(lead) => {
-                setLeadModal({ mode: "edit", lead });
-                setNote("");
-              }}
+              ownerOf={ownerOf}
+              onOpenLead={(lead) => setLeadModal({ mode: "edit", lead })}
               onEditStage={(s) => setStageModal({ mode: "edit", stage: s })}
               activeDrag={!!activeId}
             />
@@ -403,16 +492,16 @@ export default function Board({
         {mounted &&
           createPortal(
             <DragOverlay zIndex={9999} dropAnimation={{ duration: 200, easing: "cubic-bezier(0.22,1,0.36,1)" }}>
-              {activeLead ? <LeadCard lead={activeLead} overlay /> : null}
+              {activeLead ? <LeadCard lead={activeLead} owner={ownerOf(activeLead)} overlay /> : null}
             </DragOverlay>,
             document.body,
           )}
       </DndContext>
 
-      {/* Lead modal */}
+      {/* Lead modal — opened after mount so a ?lead= deep link hydrates cleanly */}
       <Modal
-        open={!!leadModal}
-        onClose={() => setLeadModal(null)}
+        open={mounted && !!leadModal}
+        onClose={closeLead}
         title={leadModal?.mode === "edit" ? openLead?.company || openLead?.name || "Lead" : "Add a lead"}
         hint={
           leadModal?.mode === "edit"
@@ -421,7 +510,13 @@ export default function Board({
         }
         width="max-w-2xl"
       >
-        <form onSubmit={submitLead} className="space-y-4">
+        {/* Keyed so a different lead, or a server-side owner/client change (Convert to
+            client), re-seeds the uncontrolled fields instead of saving stale ones. */}
+        <form
+          key={openLead ? `${openLead.id}:${openLead.owner_id ?? ""}:${openLead.client_id ?? ""}` : "new"}
+          onSubmit={submitLead}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Contact name">
               <Input name="name" required defaultValue={openLead?.name ?? ""} placeholder="Nadia Perera" />
@@ -453,19 +548,63 @@ export default function Board({
             <Field label="Next action">
               <Input name="next_action" defaultValue={openLead?.next_action ?? ""} placeholder="Send proposal" />
             </Field>
-          </div>
 
-          {leadModal?.mode === "create" && (
-            <Field label="Stage">
-              <Select name="stage_id" defaultValue={stagesProp[0]?.id}>
-                {stagesProp.map((s) => (
-                  <option key={s.id} value={s.id} className="bg-ink text-cream">
-                    {s.name}
+            {leadModal?.mode === "create" && (
+              <Field label="Stage">
+                <Select name="stage_id" defaultValue={stagesProp[0]?.id}>
+                  {stagesProp.map((s) => (
+                    <option key={s.id} value={s.id} className="bg-ink text-cream">
+                      {s.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
+            {can.ownership && (
+              <Field label="Owner" hint={ownerKnown ? undefined : "Their CRM access was removed — pick someone new."}>
+                {/* A blank value leaves the owner as is; new leads default to you. */}
+                <Select name="owner_id" defaultValue={openLead ? (ownerKnown ? openLead.owner_id ?? "" : "") : me}>
+                  {openLead && !openLead.owner_id && (
+                    <option value="" className="bg-ink text-cream">
+                      Unassigned
+                    </option>
+                  )}
+                  {!ownerKnown && openLead?.owner_id && (
+                    <option value="" className="bg-ink text-cream">
+                      {names.get(openLead.owner_id) ?? "Former teammate"}
+                    </option>
+                  )}
+                  {owners.map((m) => (
+                    <option key={m.id} value={m.id} className="bg-ink text-cream">
+                      {displayName(m)}
+                      {m.id === me ? " (you)" : ""}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+
+            {can.ownership && (clients.length > 0 || openLead?.client_id) && (
+              <Field label="Client">
+                <Select name="client_id" defaultValue={openLead?.client_id ?? ""}>
+                  <option value="" className="bg-ink text-cream">
+                    Not a client yet
                   </option>
-                ))}
-              </Select>
-            </Field>
-          )}
+                  {openLead?.client_id && !linkedClient && (
+                    <option value={openLead.client_id} className="bg-ink text-cream">
+                      Linked client (archived)
+                    </option>
+                  )}
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id} className="bg-ink text-cream">
+                      {clientTitle(c)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
+          </div>
 
           <Field label="Notes">
             <Textarea name="notes" rows={3} defaultValue={openLead?.notes ?? ""} placeholder="Context, requirements, budget…" />
@@ -477,16 +616,16 @@ export default function Board({
                 type="button"
                 variant="danger"
                 disabled={pending}
-                className="mr-auto"
+                className="mr-auto pointer-coarse:min-h-9"
                 onClick={() => {
                   if (confirm(`Delete ${openLead.company || openLead.name}? This cannot be undone.`))
-                    run(() => deleteLead(openLead.id), { onDone: (r) => r.ok && setLeadModal(null) });
+                    run(() => deleteLead(openLead.id), { onDone: (r) => r.ok && closeLead() });
                 }}
               >
                 <Icon.trash size={13} /> Delete
               </Button>
             )}
-            <Button type="button" onClick={() => setLeadModal(null)}>
+            <Button type="button" onClick={closeLead} className="pointer-coarse:min-h-9">
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={pending}>
@@ -495,38 +634,68 @@ export default function Board({
           </div>
         </form>
 
-        {leadModal?.mode === "edit" && openLead && (
-          <div className="mt-5 border-t border-cream/[0.08] pt-4">
-            <p className={labelClass}>Activity</p>
-            <div className="flex gap-2">
-              <input
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Add a note…"
-                className={fieldClass}
-              />
-              <Button
-                type="button"
-                disabled={pending || !note.trim()}
-                onClick={() => run(() => addLeadNote(openLead.id, note), { onDone: (r) => r.ok && setNote("") })}
-              >
-                Add
-              </Button>
-            </div>
-            <ul className="mt-3 space-y-2">
-              {leadTrail.length === 0 && <li className="text-[11.5px] text-sand">No activity recorded yet.</li>}
-              {leadTrail.map((a) => (
-                <li key={a.id} className="flex items-start gap-2.5 border-b border-cream/[0.05] pb-2 last:border-0">
-                  <span className="mt-0.5 shrink-0 text-sand/70">
-                    {a.kind === "stage" ? <Icon.pipeline size={13} /> : <Icon.note size={13} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-cream-2">{a.body}</span>
-                    <span className="block text-[10.5px] text-sand">{relativeTime(a.created_at)}</span>
-                  </span>
-                </li>
+        {/* Next steps sit under the form so Modal's autofocus lands on the name, not on Convert. */}
+        {openLead && ((can.clients && can.ownership) || can.invoices) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-cream/[0.08] pt-4">
+            <span className={`${labelClass} mb-0 mr-1`}>Next steps</span>
+            {can.clients &&
+              can.ownership &&
+              (openLead.client_id ? (
+                <LinkButton href={hrefFor("client", openLead.client_id) ?? "/admin/clients"}>
+                  <Icon.building size={13} /> View client
+                </LinkButton>
+              ) : (
+                <Button
+                  type="button"
+                  disabled={pending}
+                  className="pointer-coarse:min-h-9"
+                  onClick={() => run(() => convertLeadToClient(openLead.id))}
+                >
+                  <Icon.building size={13} /> Convert to client
+                </Button>
               ))}
-            </ul>
+            {can.invoices && (
+              <>
+                <LinkButton href={NEW.quote({ lead: openLead.id, client: openLead.client_id ?? undefined })}>
+                  <Icon.note size={13} /> Create quote
+                </LinkButton>
+                <LinkButton href={NEW.invoice({ lead: openLead.id, client: openLead.client_id ?? undefined })}>
+                  <Icon.receipt size={13} /> Create invoice
+                </LinkButton>
+              </>
+            )}
+          </div>
+        )}
+
+        {leadModal?.mode === "edit" && openLead && (
+          <div key={openLead.id} className="mt-5 space-y-5 border-t border-cream/[0.08] pt-4">
+            <div>
+              <p className={labelClass}>Discussion</p>
+              <CommentThread target={{ type: "lead", id: openLead.id }} people={owners} compact />
+            </div>
+            <div>
+              <p className={labelClass}>History</p>
+              <ul className="space-y-2">
+                {leadTrail.length === 0 && <li className="text-[11.5px] text-sand">No activity recorded yet.</li>}
+                {leadTrail.map((a) => {
+                  const actor = a.actor_id ? names.get(a.actor_id) : undefined;
+                  return (
+                    <li key={a.id} className="flex items-start gap-2.5 border-b border-cream/[0.05] pb-2 last:border-0">
+                      <span className="mt-0.5 shrink-0 text-sand/70">
+                        {a.kind === "stage" ? <Icon.pipeline size={13} /> : <Icon.note size={13} />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words text-[12px] text-cream-2">{a.body}</span>
+                        <span className="block text-[10.5px] text-sand">
+                          {actor ? `${actor} · ` : ""}
+                          {relativeTime(a.created_at)}
+                        </span>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           </div>
         )}
       </Modal>
@@ -534,7 +703,7 @@ export default function Board({
       {/* Stage modal */}
       <Modal
         open={!!stageModal}
-        onClose={() => setStageModal(null)}
+        onClose={closeStage}
         title={stageModal?.mode === "edit" ? "Edit stage" : "New stage"}
         hint={
           stageModal?.stage?.is_protected
@@ -552,6 +721,8 @@ export default function Board({
               placeholder="Proposal sent"
             />
           </Field>
+          {/* Disabled inputs don't submit — the locked stage still sends its (unchanged) name. */}
+          {stageModal?.stage?.is_protected && <input type="hidden" name="name" value={stageModal.stage.name} />}
           <Field label="Accent">
             <Select name="tone" defaultValue={stageModal?.stage?.tone ?? "cream"}>
               {(["terra", "cream", "success", "warn", "muted"] as StageTone[]).map((t) => (
@@ -588,6 +759,7 @@ export default function Board({
               <Button
                 type="button"
                 disabled={pending}
+                className="pointer-coarse:min-h-9"
                 onClick={() => run(() => moveStage(stageModal.stage!.id, "left"))}
               >
                 <Icon.chevronLeft size={13} /> Left
@@ -595,6 +767,7 @@ export default function Board({
               <Button
                 type="button"
                 disabled={pending}
+                className="pointer-coarse:min-h-9"
                 onClick={() => run(() => moveStage(stageModal.stage!.id, "right"))}
               >
                 Right <Icon.chevronRight size={13} />
@@ -608,7 +781,7 @@ export default function Board({
                 type="button"
                 variant="danger"
                 disabled={pending}
-                className="mr-auto"
+                className="mr-auto pointer-coarse:min-h-9"
                 onClick={() => {
                   const target = stageModal.stage!;
                   const count = leads.filter((l) => l.stage_id === target.id).length;
@@ -621,7 +794,7 @@ export default function Board({
                 <Icon.trash size={13} /> Delete stage
               </Button>
             )}
-            <Button type="button" onClick={() => setStageModal(null)}>
+            <Button type="button" onClick={closeStage} className="pointer-coarse:min-h-9">
               Cancel
             </Button>
             <Button type="submit" variant="primary" disabled={pending}>

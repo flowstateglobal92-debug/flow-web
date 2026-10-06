@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Modal from "@/components/admin/Modal";
 import { useAction } from "@/components/admin/useAction";
 import { Icon } from "@/components/admin/icons";
 import { Avatar, Badge, Button, EmptyState, Field, Panel, Select, Textarea, fieldClass } from "@/components/admin/ui";
 import { formatDateTime, relativeTime } from "@/lib/admin/format";
+import { hrefFor } from "@/lib/admin/links";
 import type { Inquiry, InquiryStatus, Stage } from "@/lib/admin/types";
 import { convertInquiries, deleteInquiries, saveInquiryNotes, setInquiryStatus } from "@/app/admin/actions/inquiries";
 
@@ -26,18 +27,50 @@ export default function InquiriesTable({
   tabs,
   activeTab,
   query,
+  focus,
+  canCrm,
 }: {
   inquiries: Inquiry[];
   stages: Stage[];
+  /** Can this person open the CRM? Without it there's no moving or viewing leads. */
+  canCrm: boolean;
   tabs: Tab[];
   activeTab: InquiryStatus | "all";
   query: string;
+  /** `?open=` — opened on load and whenever a link points here again. */
+  focus: Inquiry | null;
 }) {
   const router = useRouter();
   const { run: runAction, pending, toast } = useAction();
   const [selected, setSelected] = useState<string[]>([]);
-  const [open, setOpen] = useState<Inquiry | null>(null);
-  const [notes, setNotes] = useState("");
+  const [open, setOpen] = useState<Inquiry | null>(focus);
+  const [notes, setNotes] = useState(focus?.notes ?? "");
+
+  // A deep link that changes while the page is open opens that inquiry.
+  const [seenFocus, setSeenFocus] = useState(focus?.id ?? null);
+  if (seenFocus !== (focus?.id ?? null)) {
+    setSeenFocus(focus?.id ?? null);
+    if (focus) {
+      setOpen(focus);
+      setNotes(focus.notes ?? "");
+    }
+  }
+
+  // Opening a new one from a link reads it, the same as clicking its row.
+  const focusId = focus?.status === "new" ? focus.id : null;
+  useEffect(() => {
+    if (focusId) void setInquiryStatus([focusId], "read").then(() => router.refresh());
+  }, [focusId, router]);
+
+  const close = useCallback(() => {
+    setOpen(null);
+    // Drop ?open= so a refresh doesn't pop it back open; keep the tab and search.
+    if (focus) {
+      const params = new URLSearchParams(window.location.search);
+      params.delete("open");
+      router.replace(`/admin/inquiries${params.size ? `?${params}` : ""}`, { scroll: false });
+    }
+  }, [focus, router]);
   const [stageId, setStageId] = useState(stages[0]?.id ?? "");
   const [search, setSearch] = useState(query);
 
@@ -122,7 +155,7 @@ export default function InquiriesTable({
           <span className="mr-1 font-mono text-[11px] text-cream tabular-nums">
             {selected.length} selected
           </span>
-          {stages.length > 1 && (
+          {canCrm && stages.length > 1 && (
             <select
               value={stageId}
               onChange={(e) => setStageId(e.target.value)}
@@ -135,14 +168,16 @@ export default function InquiriesTable({
               ))}
             </select>
           )}
-          <Button
-            variant="primary"
-            disabled={pending || convertible === 0}
-            onClick={() => run(() => convertInquiries(selected, stageId))}
-          >
-            <Icon.pipeline size={13} />
-            Move to CRM{convertible !== selected.length ? ` (${convertible})` : ""}
-          </Button>
+          {canCrm && (
+            <Button
+              variant="primary"
+              disabled={pending || convertible === 0}
+              onClick={() => run(() => convertInquiries(selected, stageId))}
+            >
+              <Icon.pipeline size={13} />
+              Move to CRM{convertible !== selected.length ? ` (${convertible})` : ""}
+            </Button>
+          )}
           <Button disabled={pending} onClick={() => run(() => setInquiryStatus(selected, "read"))}>
             <Icon.check size={13} /> Mark read
           </Button>
@@ -261,7 +296,7 @@ export default function InquiriesTable({
       {/* Detail */}
       <Modal
         open={!!open}
-        onClose={() => setOpen(null)}
+        onClose={close}
         title={open?.name ?? ""}
         hint={open ? `${open.business ?? "No business given"} · ${formatDateTime(open.created_at)}` : undefined}
         width="max-w-xl"
@@ -274,7 +309,7 @@ export default function InquiriesTable({
                 onClick={() => {
                   if (confirm("Delete this inquiry?")) {
                     run(() => deleteInquiries([open.id]));
-                    setOpen(null);
+                    close();
                   }
                 }}
               >
@@ -283,8 +318,14 @@ export default function InquiriesTable({
               <Button disabled={pending} onClick={() => run(() => setInquiryStatus([open.id], "archived"), false)}>
                 Archive
               </Button>
-              {open.converted_lead_id ? (
-                <Link href="/admin/crm" className="btn btn--primary btn--sm rounded-none gap-1.5">
+              {!canCrm ? (
+                open.converted_lead_id && (
+                  <span className="inline-flex items-center gap-1.5 px-1 text-[12px] text-sand">
+                    <Icon.pipeline size={13} /> In the CRM
+                  </span>
+                )
+              ) : open.converted_lead_id ? (
+                <Link href={hrefFor("lead", open.converted_lead_id) ?? "/admin/crm"} className="btn btn--primary btn--sm rounded-none gap-1.5">
                   <Icon.pipeline size={13} /> View in CRM
                 </Link>
               ) : (
@@ -328,7 +369,7 @@ export default function InquiriesTable({
               <Icon.check size={13} /> Save note
             </Button>
 
-            {stages.length > 1 && !open.converted_lead_id && (
+            {canCrm && stages.length > 1 && !open.converted_lead_id && (
               <Field label="Move into stage">
                 <Select value={stageId} onChange={(e) => setStageId(e.target.value)}>
                   {stages.map((s) => (

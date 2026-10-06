@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/admin/auth";
+import { authorize } from "@/lib/admin/auth";
 import { attachmentUrl } from "@/lib/email/mailbox";
 import type { MailDirection } from "@/lib/email/types";
 
@@ -10,13 +10,17 @@ export const dynamic = "force-dynamic";
  *
  * Resend hands out a short-lived signed URL rather than the bytes, and that URL
  * is public to anyone holding it. Proxying keeps it server-side, puts the
- * download behind `requireAdmin`, and lets the browser see the real filename.
+ * download behind the Email permission, and lets the browser see the real filename.
  */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ direction: string; emailId: string; attachmentId: string }> },
 ) {
-  await requireAdmin();
+  try {
+    await authorize("email");
+  } catch {
+    return new Response("Not allowed.", { status: 403 });
+  }
 
   const { direction, emailId, attachmentId } = await params;
   if (direction !== "inbound" && direction !== "outbound") {

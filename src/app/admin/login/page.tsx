@@ -39,7 +39,7 @@ export default async function LoginPage({
           <p className="eyebrow mt-4 text-[10px]">Flow State · Control room</p>
           <h1 className="mt-2 font-display text-[27px] font-medium leading-tight text-cream">Sign in</h1>
           <p className="mt-2 text-[12.5px] text-sand">
-            Admin access only. Accounts are issued from Supabase.
+            Team access · accounts are issued by your administrator.
           </p>
         </div>
 

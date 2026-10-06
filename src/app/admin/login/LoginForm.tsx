@@ -18,7 +18,7 @@ export default function LoginForm({ next, denied }: { next?: string; denied?: bo
             <Icon.lock size={14} />
           </span>
           <span>
-            You&apos;re signed in, but that account isn&apos;t an admin.{" "}
+            You&apos;re signed in, but that account doesn&apos;t have access.{" "}
             <button
               type="button"
               onClick={() => void signOut()}
@@ -26,7 +26,7 @@ export default function LoginForm({ next, denied }: { next?: string; denied?: bo
             >
               Sign out
             </button>{" "}
-            and use the admin account.
+            and use an account your administrator set up.
           </span>
         </div>
       )}

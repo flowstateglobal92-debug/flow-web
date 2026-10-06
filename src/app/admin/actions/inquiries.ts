@@ -1,14 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin/auth";
+import { authorize } from "@/lib/admin/auth";
 import type { InquiryStatus } from "@/lib/admin/types";
 import { fail, nextPosition, ok, type ActionResult } from "./shared";
 
 export async function setInquiryStatus(ids: string[], status: InquiryStatus): Promise<ActionResult> {
   if (!ids.length) return ok();
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("inquiries");
     const { error } = await supabase.from("inquiries").update({ status }).in("id", ids);
     if (error) throw error;
     revalidatePath("/admin/inquiries");
@@ -21,7 +21,7 @@ export async function setInquiryStatus(ids: string[], status: InquiryStatus): Pr
 
 export async function saveInquiryNotes(id: string, notes: string): Promise<ActionResult> {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("inquiries");
     const { error } = await supabase.from("inquiries").update({ notes: notes || null }).eq("id", id);
     if (error) throw error;
     revalidatePath("/admin/inquiries");
@@ -34,7 +34,7 @@ export async function saveInquiryNotes(id: string, notes: string): Promise<Actio
 export async function deleteInquiries(ids: string[]): Promise<ActionResult> {
   if (!ids.length) return ok();
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await authorize("inquiries");
     const { error } = await supabase.from("inquiries").delete().in("id", ids);
     if (error) throw error;
     revalidatePath("/admin/inquiries");
@@ -56,7 +56,9 @@ export async function deleteInquiries(ids: string[]): Promise<ActionResult> {
 export async function convertInquiries(ids: string[], stageId?: string): Promise<ActionResult> {
   if (!ids.length) return ok();
   try {
-    const { supabase, user } = await requireAdmin();
+    const { supabase, user } = await authorize("inquiries");
+    // Converting writes leads, so it needs the CRM too.
+    await authorize("crm");
 
     let targetStage = stageId;
     if (!targetStage) {

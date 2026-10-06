@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { SUPABASE_READY } from "@/lib/supabase/env";
 
 export type ContactState = {
@@ -13,9 +13,11 @@ export type ContactState = {
 };
 
 /**
- * Public walkthrough-form submission. Writes straight into `inquiries` through
- * the anon key — RLS allows insert and nothing else (migration 0002), so the
- * form can post but can never read anyone's data back.
+ * Public walkthrough-form submission. Writes straight into `inquiries` as
+ * `anon` through a cookie-less client — RLS lets anon insert a fresh inquiry
+ * into the live workspace and nothing else (0007/0008), so the form can post
+ * but never read anything back, even from a browser that's signed in to the
+ * admin or the demo.
  */
 export async function submitInquiry(_prev: ContactState, formData: FormData): Promise<ContactState> {
   const name = String(formData.get("name") ?? "").trim();
@@ -35,7 +37,7 @@ export async function submitInquiry(_prev: ContactState, formData: FormData): Pr
     return { status: "error", error: "The form isn't connected yet. Please email support@flowstate.lk." };
   }
 
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { error } = await supabase.from("inquiries").insert({
     name,
     business: String(formData.get("business") ?? "").trim() || null,

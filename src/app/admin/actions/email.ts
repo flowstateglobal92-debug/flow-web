@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdmin } from "@/lib/admin/auth";
+import { authorize } from "@/lib/admin/auth";
 import { isEmail, splitAddresses } from "@/lib/email/address";
 import { MAILBOX_ADDRESS, MAILBOX_FROM } from "@/lib/email/config";
 import { resend, unwrap } from "@/lib/email/resend";
@@ -19,7 +19,7 @@ import { fail, ok, text, type ActionResult } from "./shared";
 export async function setMailFlags(refs: MailRef[], patch: Partial<MailFlags>): Promise<ActionResult> {
   if (!refs.length) return ok();
   try {
-    const { supabase, user } = await requireAdmin();
+    const { supabase, user } = await authorize("email");
     const rows = refs.map((ref) => ({
       email_id: ref.id,
       direction: ref.direction,
@@ -68,7 +68,7 @@ const bodyToHtml = (body: string) =>
  */
 export async function sendMail(formData: FormData): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await authorize("email");
 
     const to = splitAddresses(text(formData, "to"));
     const cc = splitAddresses(text(formData, "cc"));
@@ -135,7 +135,7 @@ export async function sendMail(formData: FormData): Promise<ActionResult> {
  */
 export async function forwardMail(emailId: string, recipients: string): Promise<ActionResult> {
   try {
-    await requireAdmin();
+    await authorize("email");
 
     const to = splitAddresses(recipients);
     if (!to.length) return fail(new Error("Add at least one recipient."));

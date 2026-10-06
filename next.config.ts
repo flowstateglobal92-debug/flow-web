@@ -39,6 +39,12 @@ const nextConfig: NextConfig = {
       // the payload is base64-encoded, which this stays under.
       bodySizeLimit: "22mb",
     },
+    // src/proxy.ts matches /admin/*, and Next buffers a proxied request body
+    // only up to this size (10MB by default), silently cutting off the rest.
+    // Keep it level with bodySizeLimit so a mail attachment that the action
+    // accepts isn't truncated on the way in. (Receipts don't come this way:
+    // they upload from the browser straight to Storage.)
+    proxyClientMaxBodySize: "22mb",
   },
 
   async headers() {

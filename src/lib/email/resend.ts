@@ -1,7 +1,6 @@
 import "server-only";
 
 import { Resend } from "resend";
-import { RESEND_READY } from "./config";
 
 let client: Resend | null = null;
 

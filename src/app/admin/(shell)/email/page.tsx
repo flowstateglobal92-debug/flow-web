@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { requireAdmin } from "@/lib/admin/auth";
+import { requireModule } from "@/lib/admin/auth";
 import { PageHead, Panel } from "@/components/admin/ui";
 import { MAILBOX_ADDRESS, MAILBOX_FROM, RESEND_READY } from "@/lib/email/config";
 import { getMail, listMail } from "@/lib/email/mailbox";
@@ -15,7 +15,7 @@ export default async function EmailPage({
 }: {
   searchParams: Promise<{ folder?: string; q?: string; after?: string; id?: string; dir?: string }>;
 }) {
-  await requireAdmin();
+  await requireModule("email");
 
   const { folder: rawFolder = "inbox", q = "", after, id, dir } = await searchParams;
   const folder: MailFolder = isFolder(rawFolder) ? rawFolder : "inbox";
