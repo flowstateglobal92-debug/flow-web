@@ -22,7 +22,17 @@ import {
 } from "@/lib/admin/invoice-types";
 import { issueDocument } from "@/app/admin/actions/invoices";
 
-export type IssuedFilter = "all" | "unpaid" | "part" | "paid" | "overdue" | "pending" | "void" | "draft";
+export type IssuedFilter =
+  | "all"
+  | "unpaid"
+  | "part"
+  | "paid"
+  | "overdue"
+  | "credited"
+  | "credit_notes"
+  | "pending"
+  | "void"
+  | "draft";
 export type Period = "month" | "year" | "all";
 
 const FILTER_TABS: { value: IssuedFilter; label: string }[] = [
@@ -31,6 +41,8 @@ const FILTER_TABS: { value: IssuedFilter; label: string }[] = [
   { value: "part", label: "Part paid" },
   { value: "paid", label: "Paid" },
   { value: "overdue", label: "Overdue" },
+  { value: "credited", label: "Credited & written off" },
+  { value: "credit_notes", label: "Credit notes" },
   { value: "pending", label: "Awaiting approval" },
   { value: "void", label: "Void" },
   { value: "draft", label: "Drafts" },
@@ -41,7 +53,10 @@ const PERIOD_LABEL: Record<Period, string> = { month: "This month", year: "This 
 /** One muted line per card: what's owed and when, or why nothing is. */
 function cardLine(inv: InvoiceWithPayments, left: number) {
   const total = docMoney(num(inv.total), inv.currency);
+  if (inv.kind === "credit_note") return `Credit note · −${total}`;
   if (inv.status === "paid") return `Paid · ${total}`;
+  if (inv.status === "credited") return `Settled by credit · ${total}`;
+  if (inv.status === "written_off") return `Written off · ${total}`;
   if (inv.status === "void") return `Void · ${total}`;
   if (inv.status === "draft") return `Not issued · ${total}`;
   if (inv.status === "pending_approval") return `Waiting for sign-off · ${total}`;
@@ -97,7 +112,7 @@ export default function IssuedList({
     if (inv.status === "draft") {
       return (
         <Button variant="primary" disabled={pending} onClick={() => run(() => issueDocument(inv.id))} className={`min-h-9 ${full ? "w-full" : ""}`}>
-          <Icon.send size={13} /> Issue
+          <Icon.send size={13} /> {inv.kind === "credit_note" ? "Apply" : "Issue"}
         </Button>
       );
     }
@@ -136,7 +151,13 @@ export default function IssuedList({
         <Stat
           label="Issued"
           value={kpis ? short(k("issued_total")) : "—"}
-          sub={kpis ? `${k("issued_count")} invoice${k("issued_count") === 1 ? "" : "s"} · ${PERIOD_LABEL[period].toLowerCase()}` : "Totals appear once invoicing is set up"}
+          sub={
+            kpis
+              ? `${k("issued_count")} invoice${k("issued_count") === 1 ? "" : "s"}${
+                  k("credit_count") ? `, less ${k("credit_count")} credit note${k("credit_count") === 1 ? "" : "s"}` : ""
+                } · ${PERIOD_LABEL[period].toLowerCase()}`
+              : "Totals appear once invoicing is set up"
+          }
           icon={<Icon.receipt size={15} />}
         />
         <Stat
@@ -163,7 +184,8 @@ export default function IssuedList({
       </div>
       {!!kpis?.other_currencies?.length && (
         <p className="mb-2 text-[11.5px] text-sand">
-          {kpis.other_currencies.join(", ")} invoices aren&apos;t in these totals — they stay in their own currency.
+          {kpis.other_currencies.join(", ")} invoices without an exchange rate aren&apos;t in these totals — add the rate on the
+          invoice to count it in rupees.
         </p>
       )}
 
@@ -242,7 +264,8 @@ export default function IssuedList({
                 <tbody>
                   {invoices.map((inv) => {
                     const overdue = displayStatus(inv, today) === "overdue";
-                    const left = Math.max(0, num(inv.total) - num(inv.amount_paid));
+                    const cn = inv.kind === "credit_note";
+                    const left = cn ? 0 : Math.max(0, num(inv.total) - num(inv.amount_paid) - num(inv.credited_total));
                     const owner = inv.owner_id ? people[inv.owner_id] : null;
                     return (
                       <tr key={inv.id} className="border-b border-cream/[0.05] align-middle transition-colors last:border-0 hover:bg-cream/[0.03]">
@@ -250,19 +273,21 @@ export default function IssuedList({
                           <Link href={`/admin/invoices/${inv.id}`} className="group block min-w-0">
                             <span className="block font-mono text-[11px] tracking-[0.06em] text-sand group-hover:text-terra-bright">
                               {inv.number ?? "Draft"}
+                              {cn && " · credit note"}
                             </span>
                             <span className="block truncate text-[13px] text-cream group-hover:text-terra-bright">{billedTo(inv)}</span>
                             {inv.subject && <span className="block truncate text-[11px] text-sand">{inv.subject}</span>}
                           </Link>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-[11.5px] text-sand">{formatDate(inv.issue_date)}</td>
-                        <td className={`whitespace-nowrap px-3 py-3 text-[11.5px] ${overdue ? "text-rose-300" : "text-sand"}`}>
-                          {inv.due_date ? formatDate(inv.due_date) : "On receipt"}
+                        <td className={`whitespace-nowrap px-3 py-3 text-[11.5px] ${overdue ? "text-bad-300" : "text-sand"}`}>
+                          {cn ? "—" : inv.due_date ? formatDate(inv.due_date) : "On receipt"}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] text-cream tabular-nums">
+                        <td className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] tabular-nums ${cn ? "text-bad-300" : "text-cream"}`}>
+                          {cn ? "−" : ""}
                           {docMoney(num(inv.total), inv.currency)}
                         </td>
-                        <td className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] tabular-nums ${num(inv.amount_paid) > 0 ? "text-emerald-300" : "text-sand/60"}`}>
+                        <td className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] tabular-nums ${num(inv.amount_paid) > 0 ? "text-ok-300" : "text-sand/60"}`}>
                           {docMoney(num(inv.amount_paid), inv.currency)}
                         </td>
                         <td className={`whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] tabular-nums ${left > 0 && (inv.status === "issued" || inv.status === "partially_paid") ? "text-terra-bright" : "text-sand/60"}`}>
@@ -290,7 +315,7 @@ export default function IssuedList({
             <ul className="md:hidden">
               {invoices.map((inv) => {
                 const overdue = displayStatus(inv, today) === "overdue";
-                const left = Math.max(0, num(inv.total) - num(inv.amount_paid));
+                const left = inv.kind === "credit_note" ? 0 : Math.max(0, num(inv.total) - num(inv.amount_paid) - num(inv.credited_total));
                 const c = control(inv, true);
                 return (
                   <li key={inv.id} className="border-b border-cream/[0.06] px-4 py-3.5 last:border-0">
@@ -300,7 +325,7 @@ export default function IssuedList({
                           {inv.number ?? "Draft"} · {formatDateShort(inv.issue_date)}
                         </span>
                         <span className="mt-0.5 block truncate font-display text-[14px] text-cream">{billedTo(inv)}</span>
-                        <span className={`mt-0.5 block truncate text-[11.5px] ${overdue ? "text-rose-300" : "text-sand"}`}>
+                        <span className={`mt-0.5 block truncate text-[11.5px] ${overdue ? "text-bad-300" : "text-sand"}`}>
                           {cardLine(inv, left)}
                         </span>
                       </Link>

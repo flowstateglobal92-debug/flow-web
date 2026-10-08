@@ -69,8 +69,8 @@ export function useAction() {
       {toast && (
         <div
           key={toast.id}
-          className={`pointer-events-auto border px-4 py-2.5 text-[12.5px] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] transition-opacity duration-300 starting:opacity-0 motion-reduce:transition-none ${
-            toast.tone === "ok" ? "border-terra/40 bg-ink-2 text-cream" : "border-rose-400/40 bg-ink-2 text-rose-200"
+          className={`pointer-events-auto border px-4 py-2.5 text-[12.5px] shadow-[0_20px_50px_-20px_var(--shadow-strong)] transition-opacity duration-300 starting:opacity-0 motion-reduce:transition-none ${
+            toast.tone === "ok" ? "border-terra/40 bg-ink-2 text-cream" : "border-bad-400/40 bg-ink-2 text-bad-200"
           }`}
         >
           {toast.text}

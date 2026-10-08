@@ -30,7 +30,8 @@ import { clearPayments, recordPayment } from "@/app/admin/actions/invoices";
 export type PayableInvoice = Pick<
   Invoice,
   "id" | "kind" | "number" | "status" | "currency" | "total" | "amount_paid" | "bill_to_name" | "bill_to_company"
->;
+> &
+  Partial<Pick<Invoice, "credited_total" | "exchange_rate">>;
 export type PaymentLine = Pick<InvoicePayment, "id" | "amount" | "amount_base" | "paid_on" | "method">;
 
 type Run = (
@@ -41,7 +42,7 @@ type Run = (
 const STATES: { value: PaymentState; label: string; on: string }[] = [
   { value: "unpaid", label: "Unpaid", on: "bg-cream/[0.10] text-cream" },
   { value: "part", label: "Part paid", on: "bg-terra/20 text-terra-bright" },
-  { value: "paid", label: "Paid", on: "bg-emerald-400/15 text-emerald-200" },
+  { value: "paid", label: "Paid", on: "bg-ok-400/15 text-ok-200" },
 ];
 
 export function PaymentSwitch({
@@ -150,7 +151,7 @@ export function usePaymentFlow({
                 <span className="block text-[12.5px] text-cream">{formatDate(p.paid_on)}</span>
                 <span className="block truncate text-[11px] text-sand">{p.method || "Payment"}</span>
               </span>
-              <span className="shrink-0 text-right font-mono text-[12px] tabular-nums text-emerald-300">
+              <span className="shrink-0 text-right font-mono text-[12px] tabular-nums text-ok-300">
                 +{docMoney(num(p.amount_base), "LKR")}
                 {invoice.currency.toUpperCase() !== "LKR" && (
                   <span className="block text-[10.5px] text-sand">{docMoney(num(p.amount), invoice.currency)}</span>
@@ -180,7 +181,11 @@ export function usePaymentFlow({
   return { pick, node };
 }
 
-/** "Record a payment" — header figures, the amount received now and the live "after this" line. */
+/**
+ * "Record a payment" — header figures, the amount received now and the live
+ * "after this" line. With `refund`, the same for money going back to the
+ * client (up to what they've paid beyond what they owe after credit notes).
+ */
 export function PaymentDialog({
   invoice,
   full,
@@ -188,6 +193,7 @@ export function PaymentDialog({
   pending,
   onClose,
   onSubmit,
+  refund = false,
 }: {
   invoice: PayableInvoice;
   full: boolean;
@@ -195,19 +201,26 @@ export function PaymentDialog({
   pending: boolean;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
+  refund?: boolean;
 }) {
   const total = num(invoice.total);
   const paid = num(invoice.amount_paid);
-  const left = round2(total - paid);
-  const [value, setValue] = useState(full ? left.toFixed(2) : "");
+  const credited = num(invoice.credited_total);
+  const left = refund ? round2(paid + credited - total) : round2(total - paid - credited);
+  const [value, setValue] = useState(full || refund ? Math.max(0, left).toFixed(2) : "");
   const entered = round2(num(value));
   const foreign = invoice.currency.toUpperCase() !== "LKR";
+  const rate = foreign && invoice.exchange_rate ? num(invoice.exchange_rate) : 0;
   const money = (v: number) => docMoney(v, invoice.currency);
 
   let after: { text: string; tone: string };
-  if (!(entered > 0)) after = { text: "Enter what arrived — the balance updates as you type.", tone: "text-sand" };
-  else if (entered > left) after = { text: `That's more than the ${money(left)} left to pay.`, tone: "text-rose-300" };
-  else if (round2(left - entered) === 0) after = { text: `After this: paid ${money(total)} · fully paid`, tone: "text-emerald-300" };
+  if (refund) {
+    if (!(entered > 0)) after = { text: "Enter what went back to the client.", tone: "text-sand" };
+    else if (entered > left) after = { text: `That's more than the ${money(left)} owed back.`, tone: "text-bad-300" };
+    else after = { text: `After this: ${money(round2(left - entered))} still owed back`, tone: "text-cream-2" };
+  } else if (!(entered > 0)) after = { text: "Enter what arrived — the balance updates as you type.", tone: "text-sand" };
+  else if (entered > left) after = { text: `That's more than the ${money(left)} left to pay.`, tone: "text-bad-300" };
+  else if (round2(left - entered) === 0) after = { text: `After this: settled in full`, tone: "text-ok-300" };
   else after = { text: `After this: paid ${money(round2(paid + entered))} · left ${money(round2(left - entered))}`, tone: "text-cream-2" };
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
@@ -219,15 +232,15 @@ export function PaymentDialog({
     <Modal
       open
       onClose={onClose}
-      title={full ? `Mark ${docLabel(invoice)} paid` : `Record a payment · ${docLabel(invoice)}`}
-      hint={`${billedTo(invoice)} · it posts to Income in Expenses.`}
+      title={refund ? `Record a refund · ${docLabel(invoice)}` : full ? `Mark ${docLabel(invoice)} paid` : `Record a payment · ${docLabel(invoice)}`}
+      hint={refund ? `${billedTo(invoice)} · it comes off Income in Expenses.` : `${billedTo(invoice)} · it posts to Income in Expenses.`}
     >
       <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-3 border border-cream/[0.08] bg-cream/[0.02]">
           {[
             { label: "Total", value: money(total), tone: "text-cream" },
-            { label: "Paid so far", value: money(paid), tone: "text-emerald-300" },
-            { label: "Left to pay", value: money(left), tone: "text-terra-bright" },
+            { label: credited > 0 ? "Paid + credited" : "Paid so far", value: money(round2(paid + credited)), tone: "text-ok-300" },
+            { label: refund ? "Owed back" : "Left to pay", value: money(Math.max(0, left)), tone: "text-terra-bright" },
           ].map((f, i) => (
             <div key={f.label} className={`min-w-0 px-3 py-2.5 ${i ? "border-l border-cream/[0.08]" : ""}`}>
               <p className="text-[9.5px] uppercase tracking-[0.16em] text-sand">{f.label}</p>
@@ -236,7 +249,7 @@ export function PaymentDialog({
           ))}
         </div>
 
-        <Field label={`Amount received now (${invoice.currency.toUpperCase()})`}>
+        <Field label={refund ? `Amount refunded (${invoice.currency.toUpperCase()})` : `Amount received now (${invoice.currency.toUpperCase()})`}>
           <Input
             name="amount"
             type="number"
@@ -255,8 +268,23 @@ export function PaymentDialog({
         </p>
 
         {foreign && (
-          <Field label="Received in LKR" hint="What landed in the bank, in rupees. Income is kept in LKR.">
-            <Input name="amount_base" type="number" inputMode="decimal" min="0.01" step="0.01" required placeholder="0.00" />
+          <Field
+            label={refund ? "Paid back in LKR" : "Received in LKR"}
+            hint={
+              rate
+                ? `Leave empty to use the invoice's rate (${rate}). Income is kept in LKR.`
+                : "What landed in the bank, in rupees. Income is kept in LKR."
+            }
+          >
+            <Input
+              name="amount_base"
+              type="number"
+              inputMode="decimal"
+              min="0.01"
+              step="0.01"
+              required={!rate}
+              placeholder={rate && entered > 0 ? round2(entered * rate).toFixed(2) : "0.00"}
+            />
           </Field>
         )}
 
@@ -285,7 +313,7 @@ export function PaymentDialog({
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={pending || !(entered > 0) || entered > left}>
-            {full ? "Mark paid" : "Record payment"}
+            {refund ? "Record refund" : full ? "Mark paid" : "Record payment"}
           </Button>
         </div>
       </form>

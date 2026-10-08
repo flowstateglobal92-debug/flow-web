@@ -28,6 +28,11 @@ function clientFields(fd: FormData) {
     tax_id: optional(fd, "tax_id"),
     website: optional(fd, "website"),
     status: STATUSES.includes(status) ? status : "active",
+    // Billing preferences (0037/0038) — only when the form showed them.
+    ...(fd.has("billing_prefs") && {
+      statement_monthly: fd.get("statement_monthly") === "on",
+      reminders_paused: fd.get("reminders_paused") === "on",
+    }),
   };
 }
 

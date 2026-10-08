@@ -7,7 +7,7 @@ import { Icon } from "@/components/admin/icons";
 import InvoiceDocument from "@/components/admin/invoice/InvoiceDocument";
 import { AutoPrint, PrintButton } from "@/components/admin/invoice/PrintTools";
 import ScaledSheet from "@/components/admin/invoice/ScaledSheet";
-import { businessFrom, docLabel, documentFromRow } from "@/lib/admin/invoice-types";
+import { brandingFrom, businessFrom, docLabel, documentFromRow, type Invoice } from "@/lib/admin/invoice-types";
 import { loadDocument, loadSettings } from "@/app/admin/(shell)/invoices/data";
 
 /** Never cached — it's somebody's invoice. */
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     .from("invoices")
     .select("kind, number")
     .eq("id", id)
-    .maybeSingle<{ kind: "invoice" | "quote"; number: string | null }>();
+    .maybeSingle<Pick<Invoice, "kind" | "number">>();
   return { title: { absolute: data ? docLabel(data) : "Invoice" } };
 }
 
@@ -43,6 +43,9 @@ export default async function PrintInvoicePage({
   const [bundle, settings] = await Promise.all([loadDocument(supabase, id), loadSettings(supabase, profile.workspace)]);
   if (!bundle) notFound();
   const { invoice, items } = bundle;
+  const credited = invoice.credited_invoice_id
+    ? (await supabase.from("invoices").select("number").eq("id", invoice.credited_invoice_id).maybeSingle<{ number: string | null }>()).data
+    : null;
 
   return (
     <div className="min-h-screen print:min-h-0">
@@ -64,10 +67,11 @@ export default async function PrintInvoicePage({
       <main className="mx-auto w-full max-w-[880px] px-4 py-8 print:max-w-none print:p-0">
         <ScaledSheet>
           <InvoiceDocument
-            doc={documentFromRow(invoice, items)}
+            doc={documentFromRow(invoice, items, credited)}
             business={businessFrom(settings)}
+            branding={brandingFrom(settings)}
             today={todayISO()}
-            className="shadow-[0_40px_120px_-40px_rgba(0,0,0,0.95)] print:shadow-none"
+            className="shadow-[0_40px_120px_-40px_var(--shadow-deep)] print:shadow-none"
           />
         </ScaledSheet>
       </main>

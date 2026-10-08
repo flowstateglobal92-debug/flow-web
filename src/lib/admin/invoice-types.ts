@@ -1,23 +1,45 @@
 /**
- * Invoices, quotes and recurring schedules — row shapes, the editor's input
- * shapes and the small pure helpers the screens share.
+ * Invoices, quotes, credit notes and recurring schedules — row shapes, the
+ * editor's input shapes and the small pure helpers the screens share.
  *
- * Mirrors supabase/migrations/0013_invoices.sql, 0014_quotes.sql and
- * 0015_recurring_invoices.sql. Columns added by later migrations are optional
- * so a page still renders while a migration is pending.
+ * Mirrors supabase/migrations/0013_invoices.sql → 0035_invoice_branding.sql.
+ * Columns added by later migrations are optional so a page still renders
+ * while a migration is pending.
  */
 import { CURRENCY_SYMBOL, addDays, money, num } from "./format";
+import type { TaxInput, TaxLine } from "./invoice-math";
+import type { NumberReset } from "./numbering";
 
-export type InvoiceKind = "invoice" | "quote";
+export type InvoiceKind = "invoice" | "quote" | "credit_note";
 
-export type InvoiceStatus = "draft" | "pending_approval" | "issued" | "partially_paid" | "paid" | "void";
+export type InvoiceStatus =
+  | "draft"
+  | "pending_approval"
+  | "issued"
+  | "partially_paid"
+  | "paid"
+  | "credited"
+  | "written_off"
+  | "void";
 export type QuoteStatus = "draft" | "sent" | "accepted" | "declined" | "expired" | "converted";
-export type DocStatus = InvoiceStatus | QuoteStatus;
+/** A credit note is draft → issued (applied to its invoice) → void. */
+export type CreditNoteStatus = "draft" | "issued" | "void";
+export type DocStatus = InvoiceStatus | QuoteStatus | CreditNoteStatus;
+
+export type CreditReason = "return" | "discount" | "error" | "write_off" | "other";
+
+export const CREDIT_REASONS: { value: CreditReason; label: string }[] = [
+  { value: "return", label: "Returned or cancelled work" },
+  { value: "discount", label: "Discount or goodwill" },
+  { value: "error", label: "Billing mistake" },
+  { value: "other", label: "Other" },
+];
 
 export type DiscountType = "amount" | "percent";
 
 export type Invoice = {
   id: string;
+  workspace?: string;
   kind: InvoiceKind;
   number: string | null;
   status: DocStatus;
@@ -58,6 +80,21 @@ export type Invoice = {
   /* 0015 */
   schedule_id?: string | null;
   period_start?: string | null;
+  /* 0038 */
+  reminders_paused?: boolean;
+  /* 0039 */
+  pay_token?: string | null;
+  /* 0031 */
+  exchange_rate?: number | null;
+  /* 0032 */
+  prices_include_tax?: boolean;
+  tax_breakdown?: TaxLine[] | null;
+  supply_date?: string | null;
+  bill_to_tax_id?: string | null;
+  /* 0033 */
+  credited_invoice_id?: string | null;
+  credit_reason?: CreditReason | null;
+  credited_total?: number;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -72,11 +109,15 @@ export type InvoiceItem = {
   quantity: number;
   unit_price: number;
   amount: number;
+  /* 0032 */
+  taxes?: TaxInput[] | null;
 };
 
 export type InvoicePayment = {
   id: string;
   invoice_id: string;
+  /* 0033: refund = money back to the client (amount still positive) */
+  kind?: "payment" | "refund";
   amount: number;
   amount_base: number;
   paid_on: string;
@@ -89,7 +130,7 @@ export type InvoicePayment = {
 
 /** A row in the Issued list carries its payments so "→ Unpaid" can list them. */
 export type InvoiceWithPayments = Invoice & {
-  invoice_payments?: Pick<InvoicePayment, "id" | "amount" | "amount_base" | "paid_on" | "method" | "reference">[];
+  invoice_payments?: Pick<InvoicePayment, "id" | "kind" | "amount" | "amount_base" | "paid_on" | "method" | "reference">[];
 };
 
 export type InvoiceSettings = {
@@ -111,13 +152,129 @@ export type InvoiceSettings = {
   quote_prefix: string;
   next_invoice_number: number;
   next_quote_number: number;
+  /* 0030 */
+  invoice_number_format?: string;
+  quote_number_format?: string;
+  credit_note_prefix?: string;
+  credit_note_number_format?: string;
+  next_credit_note_number?: number;
+  number_reset?: NumberReset;
+  fiscal_year_start_month?: number;
+  /* 0032 */
+  tax_registered?: boolean;
+  prices_include_tax?: boolean;
+  /* 0036 — email wording; empty = built in (lib/admin/document-mail.ts) */
+  email_invoice_subject?: string | null;
+  email_invoice_body?: string | null;
+  email_quote_subject?: string | null;
+  email_quote_body?: string | null;
+  email_credit_subject?: string | null;
+  email_credit_body?: string | null;
+  /* 0039 — pay-online links */
+  online_payments?: boolean;
+  payhere_enabled?: boolean;
+  stripe_enabled?: boolean;
+  /* 0038 — overdue reminders */
+  reminders_enabled?: boolean;
+  reminder_days?: number[];
+  email_reminder_subject?: string | null;
+  email_reminder_body?: string | null;
+  /* 0035 */
+  logo_mode?: LogoMode;
+  logo_data?: string | null;
+  accent_color?: string;
+  document_layout?: DocumentLayout;
+  footer_text?: string | null;
 };
+
+export type LogoMode = "brand" | "custom" | "none";
+export type DocumentLayout = "classic" | "modern" | "compact";
+
+export const DOCUMENT_LAYOUTS: { value: DocumentLayout; label: string; hint: string }[] = [
+  { value: "classic", label: "Classic", hint: "Logo top left, details in columns" },
+  { value: "modern", label: "Modern", hint: "A band of your accent colour across the top" },
+  { value: "compact", label: "Compact", hint: "Tighter, fits more lines on a page" },
+];
 
 /** What the document needs to print the "From" block and footer. */
 export type Business = Pick<
   InvoiceSettings,
   "business_name" | "business_email" | "business_phone" | "business_address" | "business_website" | "tax_id"
->;
+> & { tax_registered?: boolean };
+
+/** How the paper looks (0035). */
+export type Branding = {
+  logo_mode: LogoMode;
+  logo_data: string | null;
+  accent_color: string;
+  layout: DocumentLayout;
+  footer_text: string | null;
+};
+
+export const DEFAULT_BRANDING: Branding = {
+  logo_mode: "brand",
+  logo_data: null,
+  accent_color: "#C65D3B",
+  layout: "classic",
+  footer_text: null,
+};
+
+/** A named tax rate (0032). */
+export type TaxRate = {
+  id: string;
+  name: string;
+  rate: number;
+  compound: boolean;
+  is_default: boolean;
+  active: boolean;
+  position: number;
+  note: string | null;
+};
+
+/** A sent document, statement or reminder (0036). */
+export type DocumentEmail = {
+  id: string;
+  kind: "document" | "reminder" | "statement";
+  invoice_id: string | null;
+  client_id: string | null;
+  to_addresses: string[];
+  cc_addresses: string[];
+  subject: string;
+  step: number | null;
+  sent_by: string | null;
+  sent_at: string;
+};
+
+/** A saved product or service (0034). */
+export type CatalogueItem = {
+  id: string;
+  name: string;
+  details: string | null;
+  kind: "service" | "product";
+  code: string | null;
+  unit: string | null;
+  unit_price: number;
+  currency: string;
+  prices: Record<string, number> | null;
+  tax_rate_ids: string[] | null;
+  active: boolean;
+  position: number;
+};
+
+/** A tax rate as a line carries it. */
+export const lineTax = (r: Pick<TaxRate, "id" | "name" | "rate" | "compound">): TaxInput => ({
+  id: r.id,
+  name: r.name,
+  rate: num(r.rate),
+  compound: !!r.compound,
+});
+
+/** The catalogue item's price in a currency: its own price there, or none. */
+export function cataloguePrice(item: Pick<CatalogueItem, "unit_price" | "currency" | "prices">, currency: string) {
+  if (item.currency === currency) return num(item.unit_price);
+  const other = item.prices?.[currency];
+  return other == null ? null : num(other);
+}
 
 export const DEFAULT_SETTINGS: InvoiceSettings = {
   workspace: "live",
@@ -138,7 +295,32 @@ export const DEFAULT_SETTINGS: InvoiceSettings = {
   quote_prefix: "QT",
   next_invoice_number: 1,
   next_quote_number: 1,
+  invoice_number_format: "{PREFIX}-{SEQ:4}",
+  quote_number_format: "{PREFIX}-{SEQ:4}",
+  credit_note_prefix: "CN",
+  credit_note_number_format: "{PREFIX}-{SEQ:4}",
+  next_credit_note_number: 1,
+  number_reset: "never",
+  fiscal_year_start_month: 4,
+  tax_registered: false,
+  prices_include_tax: false,
+  logo_mode: "brand",
+  logo_data: null,
+  accent_color: "#C65D3B",
+  document_layout: "classic",
+  footer_text: null,
 };
+
+export function brandingFrom(settings: InvoiceSettings): Branding {
+  const color = settings.accent_color && /^#[0-9a-f]{6}$/i.test(settings.accent_color) ? settings.accent_color : DEFAULT_BRANDING.accent_color;
+  return {
+    logo_mode: settings.logo_mode === "custom" && settings.logo_data ? "custom" : settings.logo_mode === "none" ? "none" : "brand",
+    logo_data: settings.logo_data ?? null,
+    accent_color: color,
+    layout: settings.document_layout ?? "classic",
+    footer_text: settings.footer_text ?? null,
+  };
+}
 
 export type Frequency = "weekly" | "monthly" | "quarterly" | "yearly";
 
@@ -167,8 +349,11 @@ export type InvoiceSchedule = {
 };
 
 export type InvoiceKpis = {
+  /** Invoices issued in the period, less credit notes issued in it. */
   issued_total: number;
   issued_count: number;
+  /** Credit notes issued in the period (0033); absent before it. */
+  credit_count?: number;
   received_total: number;
   outstanding_total: number;
   outstanding_count: number;
@@ -188,6 +373,8 @@ export type ClientOption = {
   address: string | null;
   city: string | null;
   country: string | null;
+  /** TIN / VAT number, printed on tax invoices (0011). */
+  tax_id?: string | null;
 };
 
 export type LeadOption = {
@@ -201,7 +388,13 @@ export type LeadOption = {
 
 /* ───────────────────────────── editor input ───────────────────────────── */
 
-export type ItemInput = { description: string; details: string | null; quantity: number; unit_price: number };
+export type ItemInput = {
+  description: string;
+  details: string | null;
+  quantity: number;
+  unit_price: number;
+  taxes?: TaxInput[];
+};
 
 /** The `save_invoice` p_invoice keys plus the items, as the editor sends them. */
 export type DocumentInput = {
@@ -227,6 +420,13 @@ export type DocumentInput = {
   notes: string | null;
   terms: string | null;
   payment_details: string | null;
+  /* 0031–0033 */
+  exchange_rate?: number | null;
+  prices_include_tax?: boolean;
+  supply_date?: string | null;
+  bill_to_tax_id?: string | null;
+  credited_invoice_id?: string | null;
+  credit_reason?: CreditReason | null;
   items: ItemInput[];
 };
 
@@ -268,12 +468,27 @@ export type DocumentData = {
   notes: string | null;
   terms: string | null;
   payment_details: string | null;
-  items: { description: string; details: string | null; quantity: number | string; unit_price: number | string }[];
+  items: {
+    description: string;
+    details: string | null;
+    quantity: number | string;
+    unit_price: number | string;
+    taxes?: TaxInput[] | null;
+  }[];
   amount_paid: number;
   paid_at: string | null;
+  exchange_rate?: number | null;
+  prices_include_tax?: boolean;
+  supply_date?: string | null;
+  bill_to_tax_id?: string | null;
+  /** On an invoice: what its credit notes took off. */
+  credited_total?: number;
+  /** On a credit note: the number of the invoice it credits. */
+  credited_number?: string | null;
+  credit_reason?: CreditReason | null;
 };
 
-export function documentFromRow(row: Invoice, items: InvoiceItem[]): DocumentData {
+export function documentFromRow(row: Invoice, items: InvoiceItem[], credited?: { number: string | null } | null): DocumentData {
   return {
     kind: row.kind,
     number: row.number,
@@ -297,9 +512,22 @@ export function documentFromRow(row: Invoice, items: InvoiceItem[]): DocumentDat
     payment_details: row.payment_details,
     items: [...items]
       .sort((a, b) => a.position - b.position)
-      .map((i) => ({ description: i.description, details: i.details, quantity: num(i.quantity), unit_price: num(i.unit_price) })),
+      .map((i) => ({
+        description: i.description,
+        details: i.details,
+        quantity: num(i.quantity),
+        unit_price: num(i.unit_price),
+        taxes: Array.isArray(i.taxes) ? i.taxes : [],
+      })),
     amount_paid: num(row.amount_paid),
     paid_at: row.paid_at,
+    exchange_rate: row.exchange_rate == null ? null : num(row.exchange_rate),
+    prices_include_tax: !!row.prices_include_tax,
+    supply_date: row.supply_date ?? null,
+    bill_to_tax_id: row.bill_to_tax_id ?? null,
+    credited_total: num(row.credited_total),
+    credited_number: credited?.number ?? null,
+    credit_reason: row.credit_reason ?? null,
   };
 }
 
@@ -311,24 +539,37 @@ export function businessFrom(settings: InvoiceSettings): Business {
     business_address: settings.business_address,
     business_website: settings.business_website,
     tax_id: settings.tax_id,
+    tax_registered: !!settings.tax_registered,
   };
+}
+
+/** An amount in rupees: as is for LKR, × the document's rate otherwise (null without one). Same as private.base_amount. */
+export function baseAmount(amount: number, currency: string, rate: number | null | undefined) {
+  if ((currency || "LKR").toUpperCase() === "LKR") return amount;
+  if (rate == null || !(num(rate) > 0)) return null;
+  return Math.round(amount * num(rate) * 100) / 100;
 }
 
 /* ─────────────────────────────── statuses ─────────────────────────────── */
 
 /** What a row reads as today: stored status plus the two date-derived states. */
-export type DisplayStatus = DocStatus | "overdue";
+export type DisplayStatus = DocStatus | "overdue" | "applied";
 
 export function displayStatus(
-  doc: Pick<Invoice, "kind" | "status" | "due_date" | "total" | "amount_paid"> & { valid_until?: string | null },
+  doc: Pick<Invoice, "kind" | "status" | "due_date" | "total" | "amount_paid"> & {
+    valid_until?: string | null;
+    credited_total?: number | null;
+  },
   today: string,
 ): DisplayStatus {
   if (doc.kind === "quote") {
     if (doc.status === "sent" && doc.valid_until && doc.valid_until < today) return "expired";
     return doc.status;
   }
+  if (doc.kind === "credit_note") return doc.status === "issued" ? "applied" : doc.status;
   const open = doc.status === "issued" || doc.status === "partially_paid";
-  if (open && doc.due_date && doc.due_date < today && num(doc.total) - num(doc.amount_paid) > 0) return "overdue";
+  const left = num(doc.total) - num(doc.amount_paid) - num(doc.credited_total);
+  if (open && doc.due_date && doc.due_date < today && left > 0) return "overdue";
   return doc.status;
 }
 
@@ -340,6 +581,9 @@ export const STATUS_META: Record<DisplayStatus, { label: string; tone: Tone }> =
   issued: { label: "Unpaid", tone: "cream" },
   partially_paid: { label: "Part paid", tone: "terra" },
   paid: { label: "Paid", tone: "success" },
+  credited: { label: "Credited", tone: "muted" },
+  written_off: { label: "Written off", tone: "warn" },
+  applied: { label: "Applied", tone: "terra" },
   void: { label: "Void", tone: "muted" },
   overdue: { label: "Overdue", tone: "danger" },
   sent: { label: "Sent", tone: "cream" },
@@ -364,6 +608,12 @@ export const hasPaymentSwitch = (doc: Pick<Invoice, "kind" | "status" | "total">
   (doc.status === "issued" || doc.status === "partially_paid" || doc.status === "paid") &&
   num(doc.total) > 0;
 
+/** Issued invoices a credit note can be raised against. */
+export const canCredit = (doc: Pick<Invoice, "kind" | "status" | "total"> & { credited_total?: number | null }) =>
+  doc.kind === "invoice" &&
+  ["issued", "partially_paid", "paid", "credited", "written_off"].includes(doc.status) &&
+  num(doc.total) - num(doc.credited_total) > 0;
+
 /* ─────────────────────────────── helpers ─────────────────────────────── */
 
 export const CURRENCIES = Object.keys(CURRENCY_SYMBOL);
@@ -378,7 +628,13 @@ export const billedTo = (doc: Pick<Invoice, "bill_to_name" | "bill_to_company">)
   doc.bill_to_company?.trim() || doc.bill_to_name?.trim() || "Untitled";
 
 export const docLabel = (doc: Pick<Invoice, "kind" | "number">) =>
-  doc.number ?? (doc.kind === "quote" ? "Draft quote" : "Draft invoice");
+  doc.number ?? (doc.kind === "quote" ? "Draft quote" : doc.kind === "credit_note" ? "Draft credit note" : "Draft invoice");
+
+export const KIND_LABEL: Record<InvoiceKind, string> = { invoice: "Invoice", quote: "Quote", credit_note: "Credit note" };
+
+/** Money the client is owed back (paid + credited beyond the total), or 0. */
+export const refundDue = (doc: Pick<Invoice, "total" | "amount_paid"> & { credited_total?: number | null }) =>
+  Math.max(0, Math.round((num(doc.amount_paid) + num(doc.credited_total) - num(doc.total)) * 100) / 100);
 
 /** The one display-name rule (lib/admin/format), under this module's old name. */
 export { displayName as personName } from "@/lib/admin/format";
@@ -430,7 +686,7 @@ export const scheduleEnded = (s: Pick<InvoiceSchedule, "ends_on" | "next_run_on"
  * empty string for "none". Built on the server by the helpers below and
  * turned back into a DocumentInput on save.
  */
-export type EditorItem = { description: string; details: string; quantity: string; unit_price: string };
+export type EditorItem = { description: string; details: string; quantity: string; unit_price: string; taxes: TaxInput[] };
 
 export type EditorDoc = {
   kind: InvoiceKind;
@@ -454,6 +710,12 @@ export type EditorDoc = {
   notes: string;
   terms: string;
   payment_details: string;
+  exchange_rate: string;
+  prices_include_tax: boolean;
+  supply_date: string;
+  bill_to_tax_id: string;
+  credited_invoice_id: string;
+  credit_reason: CreditReason | "";
   items: EditorItem[];
 };
 
@@ -471,7 +733,33 @@ export type ScheduleDraft = {
 };
 
 const s = (v: unknown) => (v == null ? "" : String(v));
-const blankItem = (): EditorItem => ({ description: "", details: "", quantity: "1", unit_price: "" });
+export const blankItem = (taxes: TaxInput[] = []): EditorItem => ({
+  description: "",
+  details: "",
+  quantity: "1",
+  unit_price: "",
+  taxes: taxes.map((t) => ({ ...t })),
+});
+
+/**
+ * Lines as the editor keeps them. A document from before line taxes (one
+ * tax_rate for the whole document) becomes the same tax on every line, which
+ * totals exactly the same; the document rate is then cleared.
+ */
+function editorItems(
+  items: { description?: unknown; details?: unknown; quantity?: unknown; unit_price?: unknown; taxes?: unknown }[],
+  legacy: { label: string; rate: number },
+): EditorItem[] {
+  const anyTaxed = items.some((i) => Array.isArray(i.taxes) && i.taxes.length > 0);
+  const legacyTax: TaxInput[] = !anyTaxed && legacy.rate > 0 ? [{ id: null, name: legacy.label || "Tax", rate: legacy.rate, compound: false }] : [];
+  return items.map((i) => ({
+    description: s(i.description),
+    details: s(i.details),
+    quantity: String(num(i.quantity as number, 1)),
+    unit_price: String(num(i.unit_price as number)),
+    taxes: anyTaxed ? ((i.taxes as TaxInput[]) ?? []).map((t) => ({ ...t })) : legacyTax.map((t) => ({ ...t })),
+  }));
+}
 
 export const clientAddress = (c: Pick<ClientOption, "address" | "city" | "country">) =>
   [c.address, c.city, c.country].map((x) => x?.trim()).filter(Boolean).join("\n");
@@ -479,7 +767,15 @@ export const clientAddress = (c: Pick<ClientOption, "address" | "city" | "countr
 /** A new invoice or quote with the workspace defaults, optionally pre-billed to a client or lead. */
 export function blankEditorDoc(
   settings: InvoiceSettings,
-  opts: { kind: InvoiceKind; today: string; ownerId: string; client?: ClientOption | null; lead?: LeadOption | null },
+  opts: {
+    kind: InvoiceKind;
+    today: string;
+    ownerId: string;
+    client?: ClientOption | null;
+    lead?: LeadOption | null;
+    /** The workspace's default tax rates, put on the first line. */
+    defaultTaxes?: TaxInput[];
+  },
 ): EditorDoc {
   const { client, lead } = opts;
   return {
@@ -500,11 +796,18 @@ export function blankEditorDoc(
     discount_type: "amount",
     discount_value: "",
     tax_label: settings.tax_label,
-    tax_rate: settings.default_tax_rate ? String(settings.default_tax_rate) : "",
+    // Line taxes replace the document rate: a workspace's old default became a named rate in 0032.
+    tax_rate: "",
     notes: s(settings.default_notes),
     terms: s(settings.default_terms),
     payment_details: s(settings.payment_details),
-    items: [blankItem()],
+    exchange_rate: "",
+    prices_include_tax: !!settings.prices_include_tax,
+    supply_date: "",
+    bill_to_tax_id: s((client as { tax_id?: string | null } | null | undefined)?.tax_id),
+    credited_invoice_id: "",
+    credit_reason: "",
+    items: [blankItem(opts.defaultTaxes ?? [])],
   };
 }
 
@@ -527,19 +830,21 @@ export function editorDocFromRow(row: Invoice, items: InvoiceItem[], settings: I
     discount_type: row.discount_type === "percent" ? "percent" : "amount",
     discount_value: num(row.discount_value) ? String(num(row.discount_value)) : "",
     tax_label: row.tax_label || settings.tax_label,
-    tax_rate: num(row.tax_rate) ? String(num(row.tax_rate)) : "",
+    tax_rate: "",
     notes: s(row.notes),
     terms: s(row.terms),
     payment_details: s(row.payment_details),
+    exchange_rate: row.exchange_rate == null ? "" : String(num(row.exchange_rate)),
+    prices_include_tax: !!row.prices_include_tax,
+    supply_date: s(row.supply_date),
+    bill_to_tax_id: s(row.bill_to_tax_id),
+    credited_invoice_id: s(row.credited_invoice_id),
+    credit_reason: row.credit_reason ?? "",
     items: items.length
-      ? [...items]
-          .sort((a, b) => a.position - b.position)
-          .map((i) => ({
-            description: i.description,
-            details: s(i.details),
-            quantity: String(num(i.quantity, 1)),
-            unit_price: String(num(i.unit_price)),
-          }))
+      ? editorItems(
+          [...items].sort((a, b) => a.position - b.position),
+          { label: row.tax_label || settings.tax_label, rate: num(row.tax_rate) },
+        )
       : [blankItem()],
   };
 }
@@ -566,18 +871,40 @@ export function editorDocFromSchedule(schedule: InvoiceSchedule, settings: Invoi
     discount_type: t.discount_type === "percent" ? "percent" : "amount",
     discount_value: num(t.discount_value) ? String(num(t.discount_value)) : "",
     tax_label: s(t.tax_label) || settings.tax_label,
-    tax_rate: num(t.tax_rate) ? String(num(t.tax_rate)) : "",
+    tax_rate: "",
     notes: s(t.notes),
     terms: s(t.terms),
     payment_details: s(t.payment_details),
-    items: items.length
-      ? items.map((i) => ({
-          description: s(i.description),
-          details: s(i.details),
-          quantity: String(num(i.quantity, 1)),
-          unit_price: String(num(i.unit_price)),
-        }))
-      : [blankItem()],
+    exchange_rate: t.exchange_rate == null ? "" : String(num(t.exchange_rate)),
+    prices_include_tax: !!t.prices_include_tax,
+    supply_date: "",
+    bill_to_tax_id: s(t.bill_to_tax_id),
+    credited_invoice_id: "",
+    credit_reason: "",
+    items: items.length ? editorItems(items, { label: s(t.tax_label) || settings.tax_label, rate: num(t.tax_rate) }) : [blankItem()],
+  };
+}
+
+/**
+ * A credit note against an invoice, ready to edit: same bill-to, currency and
+ * rate, the invoice's lines (a full credit; trim to credit part of it).
+ */
+export function creditNoteFromInvoice(row: Invoice, items: InvoiceItem[], settings: InvoiceSettings, today: string, ownerId: string): EditorDoc {
+  const base = editorDocFromRow(row, items, settings);
+  return {
+    ...base,
+    kind: "credit_note",
+    owner_id: ownerId,
+    issue_date: today,
+    due_date: "",
+    valid_until: "",
+    subject: row.number ? `Credit for ${row.number}` : "Credit note",
+    notes: "",
+    terms: "",
+    payment_details: "",
+    supply_date: "",
+    credited_invoice_id: row.id,
+    credit_reason: "error",
   };
 }
 

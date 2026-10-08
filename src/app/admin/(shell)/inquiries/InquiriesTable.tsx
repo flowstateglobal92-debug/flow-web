@@ -223,7 +223,7 @@ export default function InquiriesTable({
                       aria-label="Select all"
                       checked={allSelected}
                       onChange={() => setSelected(allSelected ? [] : inquiries.map((i) => i.id))}
-                      className="h-3.5 w-3.5 accent-[#c65d3b]"
+                      className="h-3.5 w-3.5 accent-terra"
                     />
                   </th>
                   <th className="px-3 py-2.5 font-normal">Who</th>
@@ -249,7 +249,7 @@ export default function InquiriesTable({
                           aria-label={`Select ${i.name}`}
                           checked={isSelected}
                           onChange={() => toggle(i.id)}
-                          className="h-3.5 w-3.5 accent-[#c65d3b]"
+                          className="h-3.5 w-3.5 accent-terra"
                         />
                       </td>
                       <td className="px-3 py-3">

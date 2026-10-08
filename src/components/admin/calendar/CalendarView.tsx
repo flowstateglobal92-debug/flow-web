@@ -369,7 +369,7 @@ export default function CalendarView({
         {unscheduledTray}
 
         {failed && (
-          <div className="flex items-center justify-between gap-3 border-b border-rose-400/20 bg-rose-500/[0.06] px-4 py-2 text-[12px] text-rose-200">
+          <div className="flex items-center justify-between gap-3 border-b border-bad-400/20 bg-bad-500/[0.06] px-4 py-2 text-[12px] text-bad-200">
             <span>Couldn&apos;t load this month.</span>
             <button type="button" onClick={() => setStale(true)} className="min-h-9 underline-offset-2 hover:underline">
               Try again
@@ -428,7 +428,7 @@ export default function CalendarView({
               <span className="inline-block h-2.5 w-4 border border-cream/15" style={HATCH} /> Out · approved
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="inline-block h-2.5 w-4 border border-dashed border-amber-300/50" /> Out · pending
+              <span className="inline-block h-2.5 w-4 border border-dashed border-warn-300/50" /> Out · pending
             </span>
           </p>
         )}
@@ -525,7 +525,7 @@ function OutMarks({
             onClick={() => onOpen(t)}
             title={`${t.title}${pendingLeave ? " · pending" : ""}`}
             aria-label={`${t.title}${pendingLeave ? ", pending" : ""}`}
-            className={`rounded-full ${pendingLeave ? "outline-1 outline-dashed outline-amber-300/70" : ""}`}
+            className={`rounded-full ${pendingLeave ? "outline-1 outline-dashed outline-warn-300/70" : ""}`}
           >
             <Avatar name={name} size={16} />
           </button>
@@ -646,7 +646,7 @@ function WeekGrid({ days, today, byDay, outByDay, namesFor, onOpen, onAdd }: Sha
                   onClick={() => onOpen(t)}
                   title={`${t.title}${pendingLeave ? " · pending" : ""}`}
                   className={`flex w-full min-w-0 items-center gap-1.5 border px-1.5 py-0.5 text-left text-[10.5px] text-cream-2 ${
-                    pendingLeave ? "border-dashed border-amber-300/50" : "border-cream/15"
+                    pendingLeave ? "border-dashed border-warn-300/50" : "border-cream/15"
                   }`}
                   style={pendingLeave ? undefined : HATCH}
                 >
@@ -752,7 +752,7 @@ function Agenda({
                     type="button"
                     onClick={() => onOpen(t)}
                     className={`inline-flex min-h-8 max-w-full items-center gap-1.5 border px-2 text-[11px] text-cream-2 ${
-                      t.status === "pending" ? "border-dashed border-amber-300/50" : "border-cream/15"
+                      t.status === "pending" ? "border-dashed border-warn-300/50" : "border-cream/15"
                     }`}
                     style={t.status === "pending" ? undefined : HATCH}
                   >

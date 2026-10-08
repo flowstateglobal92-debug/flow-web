@@ -8,7 +8,7 @@ import { displayName } from "@/lib/admin/team";
 import { Icon } from "@/components/admin/icons";
 import InvoiceEditor from "@/components/admin/invoice/InvoiceEditor";
 import { cadenceLabel, editorDocFromSchedule, scheduleDraftFrom, type InvoiceSchedule } from "@/lib/admin/invoice-types";
-import { loadClients, loadInvoicePeople, loadLeads, loadSettings } from "../../data";
+import { loadClients, loadEditorExtras, loadInvoicePeople, loadLeads, loadSettings } from "../../data";
 
 export const metadata: Metadata = { title: "Recurring template" };
 
@@ -21,11 +21,12 @@ export default async function ScheduleTemplatePage({ params }: { params: Promise
   const { data: schedule } = await supabase.from("invoice_schedules").select("*").eq("id", id).maybeSingle<InvoiceSchedule>();
   if (!schedule) notFound();
 
-  const [settings, clients, leads, owners] = await Promise.all([
+  const [settings, clients, leads, owners, extras] = await Promise.all([
     loadSettings(supabase, profile.workspace),
     loadClients(supabase),
     loadLeads(supabase, profile),
     loadInvoicePeople(supabase, profile),
+    loadEditorExtras(supabase),
   ]);
 
   return (
@@ -51,6 +52,7 @@ export default async function ScheduleTemplatePage({ params }: { params: Promise
         owners={owners.map((o) => ({ id: o.id, name: displayName(o) }))}
         viewer={{ id: profile.id, admin: isApprover(profile), canClients: canAccess(profile, "clients") }}
         today={todayISO()}
+        {...extras}
       />
     </>
   );

@@ -25,6 +25,9 @@ export type Client = {
   notes: string | null;
   status: ClientStatus;
   account_manager_id?: string | null;
+  /* 0037 / 0038 — loaded separately, so they're absent until those migrations run */
+  statement_monthly?: boolean;
+  reminders_paused?: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;

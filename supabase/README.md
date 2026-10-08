@@ -1,7 +1,8 @@
 # Flow State — Supabase backend
 
-Twenty-seven migrations, one per feature (the last hardens the ones before
-it). On a new project you run every one of them, in order, once. The schema
+Twenty-nine migrations, one per feature (0027 hardens the ones before it,
+0028 is a one-off promotion, 0029 is what the desktop app syncs through). On
+a new project you run every one of them, in order, once. The schema
 is the security model: row-level security, a few guard triggers and a
 handful of RPCs decide who sees and changes what, so the app never needs the
 service-role key for everyday work.
@@ -20,7 +21,7 @@ service-role key for everyday work.
      invoices generate every morning and the demo resets every night. Without
      it, nothing breaks: the invoice pages catch up on load, and the demo
      reseeds when someone signs in to stale data.
-2. **Run `0001` → `0027` in order** — SQL editor (paste each file, Run), or
+2. **Run `0001` → `0029` in order** — SQL editor (paste each file, Run), or
    `supabase link` + `supabase db push`. Every file is idempotent.
    - 0017 creates the private `receipts` bucket and its storage policies. If
      it prints *"Receipts bucket created, but its storage policies could not
@@ -30,6 +31,10 @@ service-role key for everyday work.
      a per-entry / demo cap to the upload policy. If it warns that the policy
      *"could not be replaced"*, copy `receipts: finance uploads` from the
      bottom of `0027_security_hardening.sql` into Storage → Policies.
+   - 0029 creates the private `mail-outbox` bucket the desktop app sends
+     attachments through. If it warns that the bucket's policies *"could not
+     be"* created, add the three `mail outbox: own …` policies from the bottom
+     of `0029_desktop_sync.sql` in Storage → Policies.
    - Enabled pg_cron only after running the migrations? Schedule the jobs once:
      ```sql
      select cron.schedule('flowstate-recurring',  '30 2 * * *',  'select private.run_recurring_all()');  -- 08:00 Colombo
@@ -66,7 +71,7 @@ service-role key for everyday work.
 **Never re-run 0001–0006 on their own after 0007.** They predate teams: 0001
 would put back the single-admin `is_admin()` and the old "admin manages all"
 policies that 0007 dropped. If something needs re-applying, run the whole
-sequence 0001 → 0027 in order — every file is idempotent, and that is how the
+sequence 0001 → 0029 in order — every file is idempotent, and that is how the
 test harness checks them (it applies the full set twice).
 
 ## Security model
@@ -124,6 +129,61 @@ test harness checks them (it applies the full set twice).
 | 0025 | `0025_demo_seed.sql` | `reset_demo_workspace()`, `flowstate-demo-reset` cron job, link guards |
 | 0026 | `0026_legacy_import.sql` | `import_legacy_data()` for `npm run import:legacy` |
 | 0027 | `0027_security_hardening.sql` | admin-only re-timing / resuming of auto-issuing schedules, a year's catch-up limit, column grants on `workspaces` and the public form, stage link guard, Clients-only client threads, receipt types and caps (`receipt_room()`) |
+| 0028 | `0028_promote_admin.sql` | one-off: `admin@flowstate.com` becomes a super admin (changes nothing if the account doesn't exist) |
+| 0029 | `0029_desktop_sync.sql` | for the desktop app: `sync_grants` (the access rule as rows), ids on the two link tables, `save_invoice` with a chosen id, the `powersync` publication, the `mail-outbox` bucket, and the audience of private to-dos |
+
+## Desktop app: sync and Edge Functions
+
+The desktop app (`desktop/`) keeps an encrypted copy of the workspace on each
+computer through [PowerSync](https://www.powersync.com), and reaches the two
+things that need a secret — the Resend mailbox and Team & Users — through
+Edge Functions. Nothing here changes the website. Once, on the project:
+
+1. **Run 0029** (step 2 above). It also creates the `powersync` publication.
+2. **A login for PowerSync** — SQL editor, with a long random password of
+   your own (keep it in your password manager; it never goes in the repo):
+   ```sql
+   create role powersync_role with replication bypassrls login password '…';
+   grant usage on schema public to powersync_role;
+   grant select on all tables in schema public to powersync_role;
+   alter default privileges in schema public grant select on tables to powersync_role;
+   ```
+   `bypassrls` is required: PowerSync copies whole tables and applies the
+   read rules itself (`powersync/sync-config.yaml`), so RLS would hide rows
+   from the copy. That file is the desktop's RLS — it must say what the
+   policies say.
+3. **PowerSync instance** — powersync.com → new instance (the free tier is
+   enough to start). Database Connection → Postgres: paste the **Direct
+   connection** string from Supabase's **Connect** dialog, then set the
+   username to `powersync_role` and its password (replication can't go
+   through Supabase's pooler; PowerSync reaches the direct connection over
+   IPv6). Skip PowerSync's `CREATE PUBLICATION … FOR ALL TABLES` — 0029
+   already made a narrower one. Under **Client Auth**, tick **Use Supabase
+   Auth** (leave the legacy JWT secret empty on projects using the new
+   signing keys) and **Save and Deploy**. Then deploy
+   the sync config: check it first with `cd desktop && npm run sync:validate`,
+   and paste `supabase/powersync/sync-config.yaml` into the instance's
+   **Sync Streams** editor → **Validate** → **Deploy**. The instance URL is
+   under **Connect** in the PowerSync dashboard; it goes in
+   `FLOWSTATE_POWERSYNC_URL` (desktop `.env.local`, or the GitHub variable
+   for the release workflow).
+   - A stopped instance makes Postgres keep WAL for it: add a disk-usage alert,
+     and delete the instance's replication slot if you ever retire it.
+4. **Edge Functions** — the mailbox and Team & Users for the desktop app:
+   ```bash
+   node scripts/sync-edge-shared.mjs          # copies the shared mailbox/team code in
+   supabase functions deploy mail
+   supabase functions deploy team
+   supabase secrets set RESEND_API_KEY=… EMAIL_FROM_ADDRESS=support@flowstate.lk EMAIL_FROM_NAME="Flow State" EMAIL_INBOX_ADDRESSES=support@flowstate.lk
+   ```
+   Supabase gives functions the project URL, anon key and service role key on
+   its own. Both functions check the caller's session and access themselves.
+
+After a migration that adds or changes a synced table: re-run
+`desktop/scripts/gen-schema.mjs` against a migrated database, update and
+validate the sync config, and redeploy it. The desktop's leak tests
+(`desktop/test/e2e`) check, table by table, that each kind of account's
+device holds exactly what RLS lets it read.
 
 ## Notes on the schema
 

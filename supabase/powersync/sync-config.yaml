@@ -1,0 +1,199 @@
+# Flow State desktop - what each person's device keeps a copy of.
+#
+# PowerSync reads every change from Postgres through logical replication, so
+# row-level security does NOT apply here. These streams are the read rules for
+# the desktop app and must say exactly what the RLS policies say. Each block
+# names the policy it mirrors (migrations in ../migrations). Change a read
+# policy -> change the matching stream, and re-run the leak tests.
+#
+# public.sync_grants (0029) holds one row per module a person may open, plus
+# the markers 'member' (active super_admin/admin/member), 'admin' (active
+# super_admin/admin) and 'super_admin'. It is private.role_allows() - the same
+# rule every policy uses - written out as rows. Its `workspace` column is the
+# person's own workspace, so "workspace IN ws_x" is the workspace fence (0008)
+# and can_access('x') in one.
+#
+# Validate before deploying:   cd desktop && npm run sync:validate
+
+config:
+  edition: 3
+  # Postgres keeps microseconds; the app writes milliseconds (JS dates). One
+  # precision keeps local text comparisons and ordering consistent.
+  timestamp_max_precision: milliseconds
+
+with:
+  member_ws: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'member'
+  admin_ws: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'admin'
+  ws_inquiries: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'inquiries'
+  ws_email: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'email'
+  ws_crm: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'crm'
+  ws_clients: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'clients'
+  ws_invoices: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'invoices'
+  ws_finance: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'finance'
+  ws_reports: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'reports'
+  ws_calendar: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'calendar'
+  ws_todos: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'todos'
+  ws_workload: SELECT workspace FROM sync_grants WHERE user_id = auth.user_id() AND module = 'workload'
+
+streams:
+  # Who I am and what I may open. Unconditional on purpose: a deactivated
+  # account still learns that it is deactivated, and the app signs it out.
+  me:
+    auto_subscribe: true
+    priority: 0
+    queries:
+      - SELECT * FROM sync_grants WHERE user_id = auth.user_id()
+      - SELECT * FROM profiles WHERE id = auth.user_id()
+
+  # profiles: teammates read (0007) + fence; workspaces: read own (0008/0027).
+  team:
+    auto_subscribe: true
+    priority: 1
+    queries:
+      - SELECT * FROM profiles WHERE workspace IN member_ws
+      - SELECT * FROM workspaces WHERE id IN member_ws
+
+  # notifications: read own delivered (0009). Deliberate difference: reminders
+  # scheduled for later (deliver_at in the future) come down too, so they can
+  # fire on time while offline. The app shows a row only once deliver_at has
+  # passed. They are the recipient's own rows either way.
+  notifications:
+    auto_subscribe: true
+    priority: 1
+    queries:
+      - SELECT * FROM notifications WHERE recipient_id = auth.user_id() AND workspace IN member_ws
+
+  # todos: read (0020) = can_access('todos') AND (shared OR mine OR I'm tagged).
+  # Children follow their to-do (todo assignees: read, todo checklist: read).
+  # "Mine or tagged" is the audience (0029 section 6: creator + assignees) kept on the
+  # private to-do and on each of its children, so a row's own columns decide
+  # where it goes. No per-row lookups: those would make a bucket per to-do, and
+  # the sync service refuses a person past 1,000 of them.
+  todos:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM todos WHERE workspace IN ws_todos AND is_private = false
+      - SELECT * FROM todos WHERE workspace IN ws_todos AND auth.user_id() IN audience
+      - SELECT * FROM todo_assignees WHERE workspace IN ws_todos AND audience IS NULL
+      - SELECT * FROM todo_assignees WHERE workspace IN ws_todos AND auth.user_id() IN audience
+      - SELECT * FROM todo_checklist WHERE workspace IN ws_todos AND audience IS NULL
+      - SELECT * FROM todo_checklist WHERE workspace IN ws_todos AND auth.user_id() IN audience
+
+  # calendar: read (0005/0018); event attendees: read follows the event.
+  calendar:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM calendar_events WHERE workspace IN ws_calendar
+      - SELECT * FROM calendar_event_attendees WHERE workspace IN ws_calendar
+
+  # time off: read (0019) = own OR calendar OR workload.
+  time_off:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM time_off WHERE user_id = auth.user_id() AND workspace IN member_ws
+      - SELECT * FROM time_off WHERE workspace IN ws_calendar
+      - SELECT * FROM time_off WHERE workspace IN ws_workload
+
+  # clients: module + clients: pickers read (0011) = clients OR invoices OR crm
+  # OR calendar OR todos.
+  clients:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM clients WHERE workspace IN ws_clients
+      - SELECT * FROM clients WHERE workspace IN ws_invoices
+      - SELECT * FROM clients WHERE workspace IN ws_crm
+      - SELECT * FROM clients WHERE workspace IN ws_calendar
+      - SELECT * FROM clients WHERE workspace IN ws_todos
+
+  # stages / leads / lead activities: module (0003/0007).
+  crm:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM pipeline_stages WHERE workspace IN ws_crm
+      - SELECT * FROM leads WHERE workspace IN ws_crm
+      - SELECT * FROM lead_activities WHERE workspace IN ws_crm
+
+  # inquiries: module (0002/0007).
+  inquiries:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM inquiries WHERE workspace IN ws_inquiries
+
+  # finance: module (0004/0007), finance attachments: module and budgets:
+  # finance reads (0017).
+  finance:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM finance_entries WHERE workspace IN ws_finance
+      - SELECT * FROM finance_attachments WHERE workspace IN ws_finance
+      - SELECT * FROM budgets WHERE workspace IN ws_finance
+      # suppliers / bills / bill payments / bill schedules: module (0040).
+      - SELECT * FROM suppliers WHERE workspace IN ws_finance
+      - SELECT * FROM bills WHERE workspace IN ws_finance
+      - SELECT * FROM bill_payments WHERE workspace IN ws_finance
+      - SELECT * FROM bill_schedules WHERE workspace IN ws_finance
+      # bank accounts / statement lines: module (0041).
+      - SELECT * FROM bank_accounts WHERE workspace IN ws_finance
+      - SELECT * FROM bank_lines WHERE workspace IN ws_finance
+
+  # invoices / items / payments: module (0013); schedules: module (0015);
+  # invoice settings: read (0013) = invoices OR reports. Settings are keyed by
+  # workspace, which stands in for the id the device needs.
+  invoices:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM invoices WHERE workspace IN ws_invoices
+      - SELECT * FROM invoice_items WHERE workspace IN ws_invoices
+      - SELECT * FROM invoice_payments WHERE workspace IN ws_invoices
+      - SELECT * FROM invoice_schedules WHERE workspace IN ws_invoices
+      - SELECT *, workspace AS id FROM invoice_settings WHERE workspace IN ws_invoices
+      - SELECT *, workspace AS id FROM invoice_settings WHERE workspace IN ws_reports
+
+  # tax rates: read (0032) = invoices OR reports OR finance. Admins write
+  # (on the server: settings are online-only on the desktop).
+  tax_rates:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM tax_rates WHERE workspace IN ws_invoices
+      - SELECT * FROM tax_rates WHERE workspace IN ws_reports
+      - SELECT * FROM tax_rates WHERE workspace IN ws_finance
+
+  # catalogue items: module (0034) = invoices.
+  catalogue:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM catalogue_items WHERE workspace IN ws_invoices
+
+  # document emails: read (0036) = invoices; a client's statements (no
+  # invoice) with clients too.
+  document_emails:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM document_emails WHERE workspace IN ws_invoices
+      - SELECT * FROM document_emails WHERE workspace IN ws_clients AND invoice_id IS NULL
+
+  # approval requests: own or approver (0016).
+  approvals:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM approval_requests WHERE requested_by = auth.user_id() AND workspace IN member_ws
+      - SELECT * FROM approval_requests WHERE workspace IN admin_ws
+
+  # comments: read with the record (0021, 0027). Exactly one parent is set
+  # (comments_one_parent), so each branch of the policy's CASE is one query;
+  # a lead, client or invoice is visible exactly when its module is, and a
+  # to-do's comments carry its audience (as above).
+  comments:
+    auto_subscribe: true
+    queries:
+      - SELECT * FROM comments WHERE workspace IN ws_crm AND lead_id IS NOT NULL
+      - SELECT * FROM comments WHERE workspace IN ws_clients AND client_id IS NOT NULL
+      - SELECT * FROM comments WHERE workspace IN ws_invoices AND invoice_id IS NOT NULL
+      - SELECT * FROM comments WHERE workspace IN ws_todos AND todo_id IS NOT NULL AND audience IS NULL
+      - SELECT * FROM comments WHERE workspace IN ws_todos AND todo_id IS NOT NULL AND auth.user_id() IN audience
+
+  # email: module (0006/0007). Keyed by the Resend message id.
+  email:
+    auto_subscribe: true
+    queries:
+      - SELECT *, email_id AS id FROM email_states WHERE workspace IN ws_email

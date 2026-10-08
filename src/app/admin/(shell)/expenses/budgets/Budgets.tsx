@@ -81,7 +81,7 @@ export default function Budgets({ budgets, ready, canEdit }: { budgets: BudgetRo
           Spend counts approved expenses in the current period. Finance users are alerted once at the warning line and once past 100%.
         </p>
         {canEdit && (
-          <Button variant="primary" className="min-h-9 sm:min-h-0" onClick={() => setModal({})}>
+          <Button variant="primary" className="min-h-9 sm:min-h-0" data-shortcut="new" onClick={() => setModal({})}>
             <Icon.plus size={13} /> Add budget
           </Button>
         )}
@@ -177,9 +177,9 @@ function BudgetCard({ budget: b, canEdit, onEdit }: { budget: BudgetRow; canEdit
   const state = stateOf(b);
   const word =
     state === "over" ? (
-      <span className="text-rose-200">Over by {money(b.spent - b.amount)}</span>
+      <span className="text-bad-200">Over by {money(b.spent - b.amount)}</span>
     ) : state === "warn" ? (
-      <span className="text-amber-200">Near limit · {Math.round(b.percent)}%</span>
+      <span className="text-warn-200">Near limit · {Math.round(b.percent)}%</span>
     ) : (
       <span>{Math.round(b.percent)}%</span>
     );
@@ -204,7 +204,7 @@ function BudgetCard({ budget: b, canEdit, onEdit }: { budget: BudgetRow; canEdit
   // The whole card opens the editor for admins — an overlay button keeps the markup valid.
   return (
     <div
-      className={`relative min-w-0 border border-cream/[0.08] bg-[linear-gradient(180deg,rgba(243,233,220,0.045),rgba(243,233,220,0.015))] px-4 py-3.5 transition-colors duration-300 ${
+      className={`relative min-w-0 border border-cream/[0.08] surface px-4 py-3.5 transition-colors duration-300 ${
         canEdit ? "hover:border-cream/20" : ""
       } ${b.active ? "" : "opacity-60"}`}
     >

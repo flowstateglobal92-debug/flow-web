@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The desktop app (Electron, own toolchain), the promo video (Remotion)
+    // and the Supabase Edge Functions (Deno) are checked by their own configs.
+    "desktop/**",
+    "promo-video/**",
+    "supabase/functions/**",
   ]),
 ]);
 

@@ -25,6 +25,8 @@ export type RouteTab = {
   exact?: boolean;
   /** Active when this search param equals `value` (for ?tab= style tabs). */
   param?: { key: string; value: string; isDefault?: boolean };
+  /** Paths under this tab's prefix that belong to none of the tabs (a settings page, say). */
+  not?: string[];
 };
 
 export function RouteTabs({ tabs, className = "" }: { tabs: RouteTab[]; className?: string }) {
@@ -38,6 +40,7 @@ export function RouteTabs({ tabs, className = "" }: { tabs: RouteTab[]; classNam
       return pathname === path && (v === t.param.value || (!v && !!t.param.isDefault));
     }
     if (t.exact) return pathname === path;
+    if (t.not?.some((n) => pathname === n || pathname.startsWith(`${n}/`))) return false;
     return pathname === path || pathname.startsWith(`${path}/`);
   };
 

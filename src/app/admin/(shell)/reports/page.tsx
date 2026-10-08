@@ -38,16 +38,30 @@ export default async function ProfitLossPage({
 }: {
   searchParams: Promise<{ period?: string; at?: string; from?: string; to?: string }>;
 }) {
-  const { supabase } = await requireModule("reports");
+  const { supabase, profile } = await requireModule("reports");
   const sp = await searchParams;
   const today = todayISO();
 
+  // The tax year's first month (April in Sri Lanka) — invoice settings are readable with Reports.
+  const { data: cfg } = await supabase
+    .from("invoice_settings")
+    .select("fiscal_year_start_month")
+    .eq("workspace", profile.workspace)
+    .maybeSingle<{ fiscal_year_start_month: number | null }>();
+  const fyStart = cfg?.fiscal_year_start_month ?? 4;
+
   const custom = sp.period === "custom" && isDay(sp.from) && isDay(sp.to) && sp.from <= sp.to;
-  const period: Period = custom ? "custom" : sp.period === "quarter" || sp.period === "year" ? sp.period : "month";
+  const period: Period = custom
+    ? "custom"
+    : sp.period === "quarter" || sp.period === "year" || sp.period === "tax_year"
+      ? sp.period
+      : "month";
   const at = isDay(sp.at) ? sp.at : today;
-  const range = custom ? { from: sp.from!, to: sp.to! } : periodRange(period as Exclude<Period, "custom">, at);
+  const range = custom ? { from: sp.from!, to: sp.to! } : periodRange(period as Exclude<Period, "custom">, at, fyStart);
   const prev =
-    period === "custom" ? previousRange(range.from, range.to) : periodRange(period, monthStart(range.from, period === "month" ? -1 : period === "quarter" ? -3 : -12));
+    period === "custom"
+      ? previousRange(range.from, range.to)
+      : periodRange(period, monthStart(range.from, period === "month" ? -1 : period === "quarter" ? -3 : -12), fyStart);
 
   // The trend always shows at least the 12 months ending with the period.
   const trendFrom = monthStart(range.to, -11) < range.from ? monthStart(range.to, -11) : range.from;
@@ -80,6 +94,7 @@ export default async function ProfitLossPage({
       categories={(data?.by_category ?? []).map((c) => ({ kind: c.kind === "income" ? "income" : "expense", category: c.category, amount: num(c.amount) }))}
       months={fillMonths(trendFrom, range.to, (trendData?.monthly ?? []).map((m) => ({ ...m, month: String(m.month) })))}
       isCurrent={range.from <= today && today <= range.to}
+      fyStart={fyStart}
     />
   );
 }

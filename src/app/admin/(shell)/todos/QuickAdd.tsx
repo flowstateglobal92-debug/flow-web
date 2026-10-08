@@ -59,7 +59,7 @@ export default function QuickAdd({ people, run, pending }: { people: TeamMember[
   };
 
   return (
-    <div className="mb-4 border border-cream/[0.08] bg-[linear-gradient(180deg,rgba(243,233,220,0.04),rgba(243,233,220,0.01))] p-3">
+    <div className="mb-4 border border-cream/[0.08] surface p-3">
       <div className="flex flex-col gap-2 md:flex-row md:items-start">
         <div className="min-w-0 flex-1">
           <MentionInput

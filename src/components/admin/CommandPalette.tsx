@@ -19,6 +19,8 @@ import type { AccessKey, SearchResult, ShellProfile } from "@/lib/admin/types";
  * Pages and quick actions are filtered by what this person can open (the
  * pages re-check). Records come from GET /admin/search, which runs the RLS-
  * bound search_everything RPC — debounced, and each keystroke aborts the last.
+ * ⌘↵ (or ⌘-click) opens the pick separately: a new tab on the website, a new
+ * window in the desktop app.
  */
 export const OPEN_PALETTE_EVENT = "flowstate:open-palette";
 
@@ -165,10 +167,11 @@ function Palette({ profile, onClose }: { profile: ShellProfile; onClose: () => v
     list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
   }, [current]);
 
-  const go = (entry: Entry | undefined) => {
+  const go = (entry: Entry | undefined, separately = false) => {
     if (!entry) return;
     onClose();
-    router.push(entry.href);
+    if (separately) window.open(entry.href, "_blank", "noopener");
+    else router.push(entry.href);
   };
 
   const onKeyDown = (e: ReactKeyboardEvent) => {
@@ -181,7 +184,7 @@ function Palette({ profile, onClose }: { profile: ShellProfile; onClose: () => v
       setActive(entries.length ? (current - 1 + entries.length) % entries.length : 0);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      go(entries[current]);
+      go(entries[current], e.metaKey || e.ctrlKey);
     } else if (e.key === "Escape") {
       // Close the palette only — not a modal that may be open underneath.
       e.preventDefault();
@@ -216,7 +219,7 @@ function Palette({ profile, onClose }: { profile: ShellProfile; onClose: () => v
         tabIndex={-1}
         aria-label="Close search"
         onClick={onClose}
-        className="absolute inset-0 cursor-default bg-ink/80 backdrop-blur-[3px]"
+        className="absolute inset-0 cursor-default scrim backdrop-blur-[3px]"
       />
       <div
         role="dialog"
@@ -279,7 +282,7 @@ function Palette({ profile, onClose }: { profile: ShellProfile; onClose: () => v
                     aria-selected={on}
                     data-active={on}
                     onMouseMove={() => !on && setActive(index)}
-                    onClick={() => go(entry)}
+                    onClick={(e) => go(entry, e.metaKey || e.ctrlKey)}
                     className={`flex min-h-11 w-full items-center gap-3 border px-2.5 py-2 text-left transition-colors duration-150 sm:min-h-0 ${
                       on ? "border-terra/40 bg-terra/[0.10] text-cream" : "border-transparent text-cream-2"
                     }`}
@@ -320,6 +323,7 @@ function Palette({ profile, onClose }: { profile: ShellProfile; onClose: () => v
         <div className="hidden items-center gap-4 border-t border-cream/[0.09] px-4 py-2 font-mono text-[10px] text-sand/80 sm:flex">
           <span>↑↓ move</span>
           <span>↵ open</span>
+          <span>⌘↵ open separately</span>
           <span>⌘K toggle</span>
         </div>
       </div>

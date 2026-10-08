@@ -96,7 +96,7 @@ export default function Bell({ compact = false }: { compact?: boolean }) {
       >
         <Icon.bell size={16} />
         {unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 min-w-[16px] bg-terra px-1 text-center font-mono text-[9.5px] leading-[16px] text-ink tabular-nums">
+          <span className="absolute -right-0.5 -top-0.5 min-w-[16px] bg-terra px-1 text-center font-mono text-[9.5px] leading-[16px] text-on-terra tabular-nums">
             {unread > 99 ? "99+" : unread}
           </span>
         )}

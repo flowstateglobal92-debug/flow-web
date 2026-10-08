@@ -9,6 +9,7 @@ import { Tabs } from "@/components/admin/Tabs";
 import { useAction } from "@/components/admin/useAction";
 import { Avatar, Button, EmptyState, Panel, Stat } from "@/components/admin/ui";
 import InvoiceDocument from "@/components/admin/invoice/InvoiceDocument";
+import { DownloadPdfButton, EmailDocumentButton, PaymentLinkButton, SentHistory } from "@/components/admin/invoice/DocumentMail";
 import { PaymentDialog, PaymentSwitch, usePaymentFlow } from "@/components/admin/invoice/Payments";
 import QuoteActions from "@/components/admin/invoice/QuoteActions";
 import ScaledSheet from "@/components/admin/invoice/ScaledSheet";
@@ -17,14 +18,20 @@ import { formatDate, formatDateTime, num } from "@/lib/admin/format";
 import { hrefFor } from "@/lib/admin/links";
 import type { ActivityEntry, TeamMember } from "@/lib/admin/types";
 import {
+  CREDIT_REASONS,
+  KIND_LABEL,
   billedTo,
+  canCredit,
   displayStatus,
   docLabel,
   docMoney,
   documentFromRow,
   hasPaymentSwitch,
   paymentState,
+  refundDue,
+  type Branding,
   type Business,
+  type DocumentEmail,
   type Invoice,
   type InvoiceItem,
   type InvoicePayment,
@@ -35,19 +42,31 @@ import {
   duplicateDocument,
   issueDocument,
   recordPayment,
+  recordRefund,
+  setInvoiceReminders,
   voidInvoice,
+  writeOffInvoice,
 } from "@/app/admin/actions/invoices";
 
 export type DetailTab = "preview" | "payments" | "comments" | "activity";
 
 type Ref = { id: string; label: string } | null;
-export type RelatedLinks = { sourceQuote: Ref; converted: Ref; schedule: Ref; client: Ref; lead: Ref };
+export type RelatedLinks = { sourceQuote: Ref; converted: Ref; schedule: Ref; client: Ref; lead: Ref; credited?: Ref };
+
+/** A credit note listed on its invoice. */
+export type CreditNoteRow = Pick<Invoice, "id" | "number" | "status" | "total" | "credit_reason" | "issue_date">;
 
 export default function InvoiceDetail({
   invoice,
   items,
   payments,
   business,
+  branding,
+  creditNotes = [],
+  emails = [],
+  creditedNumber = null,
+  isAdmin = false,
+  onlinePayments = false,
   people,
   names,
   activity,
@@ -60,6 +79,13 @@ export default function InvoiceDetail({
   items: InvoiceItem[];
   payments: InvoicePayment[];
   business: Business;
+  branding?: Branding;
+  creditNotes?: CreditNoteRow[];
+  emails?: DocumentEmail[];
+  creditedNumber?: string | null;
+  isAdmin?: boolean;
+  /** Online payment is on (0039): open invoices offer their pay link. */
+  onlinePayments?: boolean;
   people: TeamMember[];
   names: Record<string, string>;
   activity: ActivityEntry[];
@@ -81,17 +107,30 @@ export default function InvoiceDetail({
   // Paid → part is done on the Payments tab; here that's a tab switch, not a navigation.
   const showPayments = useCallback(() => setTab("payments"), []);
   const flow = usePaymentFlow({ run, pending, today, onShowPayments: showPayments });
-  const [paying, setPaying] = useState(false);
+  const [paying, setPaying] = useState<false | "payment" | "refund">(false);
 
   const quote = invoice.kind === "quote";
+  const credit = invoice.kind === "credit_note";
   const status = displayStatus(invoice, today);
   const total = num(invoice.total);
   const paid = num(invoice.amount_paid);
-  const left = invoice.status === "void" ? 0 : Math.max(0, total - paid);
+  const credited = num(invoice.credited_total);
+  const left = invoice.status === "void" ? 0 : Math.max(0, total - paid - credited);
+  const owedBack = credit || quote ? 0 : refundDue(invoice);
   const money = (v: number) => docMoney(v, invoice.currency);
-  const canPay = !quote && (invoice.status === "issued" || invoice.status === "partially_paid");
-  const editable = !["void", "pending_approval", "converted"].includes(invoice.status);
+  const canPay = !quote && !credit && (invoice.status === "issued" || invoice.status === "partially_paid");
+  const editable = !["void", "pending_approval", "converted"].includes(invoice.status) && !(credit && invoice.status !== "draft");
   const back = quote ? "/admin/invoices/quotes" : "/admin/invoices";
+  const issuedCredits = creditNotes.filter((c) => c.status === "issued");
+
+  const writeOff = () => {
+    const note = window.prompt(
+      `Write off the ${money(left)} left on ${docLabel(invoice)} as bad debt? A credit note closes it.\n\nA note for the record (optional):`,
+      "",
+    );
+    if (note === null) return;
+    run(() => writeOffInvoice(invoice.id, note));
+  };
 
   const duplicate = () =>
     run(() => duplicateDocument(invoice.id), {
@@ -101,7 +140,7 @@ export default function InvoiceDetail({
     });
 
   const remove = () => {
-    if (!confirm(`Delete this draft ${quote ? "quote" : "invoice"}? This can't be undone.`)) return;
+    if (!confirm(`Delete this draft ${KIND_LABEL[invoice.kind].toLowerCase()}? This can't be undone.`)) return;
     run(() => deleteDocument(invoice.id), {
       onDone: (r) => {
         if (r.ok) router.push(back);
@@ -111,7 +150,7 @@ export default function InvoiceDetail({
 
   const tabs: { value: DetailTab; label: string; count?: number }[] = [
     { value: "preview", label: "Preview" },
-    ...(quote ? [] : [{ value: "payments" as const, label: "Payments", count: payments.length }]),
+    ...(quote || credit ? [] : [{ value: "payments" as const, label: "Payments", count: payments.length }]),
     { value: "comments", label: "Comments" },
     { value: "activity", label: "Activity" },
   ];
@@ -121,14 +160,14 @@ export default function InvoiceDetail({
       {/* Header — screen only: ⌘P prints just the paper (the Print / PDF page is the proper copy) */}
       <div className="no-print mb-4">
         <Link href={back} className="inline-flex min-h-9 items-center gap-1.5 text-[12px] text-sand transition-colors hover:text-cream">
-          <Icon.chevronLeft size={14} /> {quote ? "Quotes" : "Issued invoices"}
+          <Icon.chevronLeft size={14} /> {quote ? "Quotes" : credit ? "Issued invoices · credit notes" : "Issued invoices"}
         </Link>
       </div>
       <div className="no-print mb-5 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-terra-bright">
-              {quote ? "Quote" : "Invoice"} · {invoice.number ?? "Draft"}
+              {KIND_LABEL[invoice.kind]} · {invoice.number ?? "Draft"}
             </span>
             <StatusBadge doc={invoice} today={today} />
           </p>
@@ -137,9 +176,10 @@ export default function InvoiceDetail({
             {[
               invoice.subject,
               `Issued ${formatDate(invoice.issue_date)}`,
+              // A credit note's invoice is on the related line below and in its own tile.
               quote
                 ? invoice.valid_until && `Valid until ${formatDate(invoice.valid_until)}`
-                : invoice.due_date && `Due ${formatDate(invoice.due_date)}`,
+                : !credit && invoice.due_date && `Due ${formatDate(invoice.due_date)}`,
               invoice.owner_id && names[invoice.owner_id] && `Owner ${names[invoice.owner_id]}`,
             ]
               .filter(Boolean)
@@ -151,12 +191,24 @@ export default function InvoiceDetail({
         <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
           {invoice.status === "draft" && !quote && (
             <Button variant="primary" disabled={pending} onClick={() => run(() => issueDocument(invoice.id))} className="min-h-9">
-              <Icon.send size={13} /> Issue
+              <Icon.send size={13} /> {credit ? "Apply" : "Issue"}
+            </Button>
+          )}
+          {owedBack > 0 && (
+            <Button variant="primary" disabled={pending} onClick={() => setPaying("refund")} className="min-h-9">
+              Record refund
             </Button>
           )}
           {quote && <QuoteActions quote={invoice} run={run} pending={pending} today={today} canCrm={canCrm} />}
           {hasPaymentSwitch(invoice) && (
             <PaymentSwitch state={paymentState(invoice)} disabled={pending} onPick={(next) => flow.pick(invoice, payments, next)} />
+          )}
+          {!["void", "pending_approval"].includes(invoice.status) && (
+            <EmailDocumentButton id={invoice.id} label={KIND_LABEL[invoice.kind].toLowerCase()} run={run} pending={pending} />
+          )}
+          <DownloadPdfButton id={invoice.id} run={run} pending={pending} />
+          {onlinePayments && invoice.kind === "invoice" && ["issued", "partially_paid"].includes(invoice.status) && (
+            <PaymentLinkButton id={invoice.id} run={run} pending={pending} />
           )}
           <a
             href={`${hrefFor("invoice_print", invoice.id)}?print=1`}
@@ -164,22 +216,46 @@ export default function InvoiceDetail({
             rel="noopener"
             className={`${linkButton.ghost} min-h-9`}
           >
-            <Icon.printer size={13} /> Print / PDF
+            <Icon.printer size={13} /> Print
           </a>
           {editable && (
             <Link href={`/admin/invoices/${invoice.id}/edit`} className={`${linkButton.ghost} min-h-9`}>
               <Icon.edit size={13} /> Edit
             </Link>
           )}
-          <Button variant="quiet" disabled={pending} onClick={duplicate} className="min-h-9">
-            <Icon.copy size={13} /> Duplicate
-          </Button>
-          {!quote && paid === 0 && ["issued", "partially_paid", "paid"].includes(invoice.status) && (
+          {canCredit(invoice) && (
+            <Link href={`/admin/invoices/new?credit=${invoice.id}`} className={`${linkButton.ghost} min-h-9`}>
+              <Icon.reply size={13} /> Credit note
+            </Link>
+          )}
+          {isAdmin && invoice.kind === "invoice" && ["issued", "partially_paid"].includes(invoice.status) && left > 0 && (
+            <Button variant="quiet" disabled={pending} onClick={writeOff} className="min-h-9">
+              Write off
+            </Button>
+          )}
+          {!credit && (
+            <Button variant="quiet" disabled={pending} onClick={duplicate} className="min-h-9">
+              <Icon.copy size={13} /> Duplicate
+            </Button>
+          )}
+          {invoice.kind === "invoice" && paid === 0 && credited === 0 && ["issued", "partially_paid", "paid"].includes(invoice.status) && (
             <Button
               variant="quiet"
               disabled={pending}
               onClick={() => {
                 if (confirm(`Void ${docLabel(invoice)}? It stays on record with its number, marked void.`)) run(() => voidInvoice(invoice.id));
+              }}
+              className="min-h-9"
+            >
+              <Icon.archive size={13} /> Void
+            </Button>
+          )}
+          {credit && invoice.status === "issued" && (
+            <Button
+              variant="quiet"
+              disabled={pending}
+              onClick={() => {
+                if (confirm(`Void ${docLabel(invoice)}? Its invoice owes the ${money(total)} again.`)) run(() => voidInvoice(invoice.id));
               }}
               className="min-h-9"
             >
@@ -197,7 +273,25 @@ export default function InvoiceDetail({
       {/* Figures */}
       <div className="no-print mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Stat label="Total" value={money(total)} sub={`${items.length} line${items.length === 1 ? "" : "s"} · ${invoice.currency}`} />
-        {quote ? (
+        {credit ? (
+          <>
+            <Stat
+              label="Credits"
+              value={creditedNumber ?? "—"}
+              sub={invoice.status === "issued" ? "Taken off that invoice" : invoice.status === "void" ? "Void — not applied" : "Applied when issued"}
+              tone="terra"
+            />
+            <Stat
+              label="Reason"
+              value={
+                invoice.credit_reason === "write_off"
+                  ? "Written off"
+                  : (CREDIT_REASONS.find((r) => r.value === invoice.credit_reason)?.label ?? "Other")
+              }
+              sub={formatDate(invoice.issue_date)}
+            />
+          </>
+        ) : quote ? (
           <>
             <Stat
               label="Valid until"
@@ -225,26 +319,75 @@ export default function InvoiceDetail({
             <Stat
               label="Paid so far"
               value={money(paid)}
-              sub={payments.length ? `${payments.length} payment${payments.length === 1 ? "" : "s"} · in Income` : "Nothing received yet"}
+              sub={
+                credited > 0
+                  ? `${money(credited)} credited too`
+                  : payments.length
+                    ? `${payments.length} entr${payments.length === 1 ? "y" : "ies"} · in Income`
+                    : "Nothing received yet"
+              }
               tone="success"
             />
-            <Stat
-              label="Left to pay"
-              value={money(left)}
-              sub={
-                invoice.status === "paid"
-                  ? `Paid${invoice.paid_at ? ` ${formatDate(invoice.paid_at)}` : ""}`
-                  : status === "overdue"
-                    ? `Overdue since ${formatDate(invoice.due_date!)}`
-                    : invoice.due_date
-                      ? `Due ${formatDate(invoice.due_date)}`
-                      : "Due on receipt"
-              }
-              tone={status === "overdue" ? "danger" : left > 0 ? "terra" : "neutral"}
-            />
+            {owedBack > 0 ? (
+              <Stat label="Refund due" value={money(owedBack)} sub="Paid beyond what's owed after credits" tone="terra" />
+            ) : (
+              <Stat
+                label="Left to pay"
+                value={money(left)}
+                sub={
+                  invoice.status === "paid"
+                    ? `Paid${invoice.paid_at ? ` ${formatDate(invoice.paid_at)}` : ""}`
+                    : invoice.status === "credited"
+                      ? "Settled by credit notes"
+                      : invoice.status === "written_off"
+                        ? "Written off"
+                        : status === "overdue"
+                          ? `Overdue since ${formatDate(invoice.due_date!)}`
+                          : invoice.due_date
+                            ? `Due ${formatDate(invoice.due_date)}`
+                            : "Due on receipt"
+                }
+                tone={status === "overdue" ? "danger" : left > 0 ? "terra" : "neutral"}
+              />
+            )}
           </>
         )}
       </div>
+
+      <SentHistory emails={emails} names={names} />
+      {invoice.kind === "invoice" && ["issued", "partially_paid"].includes(invoice.status) && (
+        <p className="no-print -mt-3 mb-5 flex flex-wrap items-center gap-2 text-[11.5px] text-sand">
+          {invoice.reminders_paused ? "Automatic reminders are off for this invoice." : "Automatic reminders follow the settings when it's overdue."}
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => run(() => setInvoiceReminders(invoice.id, !invoice.reminders_paused))}
+            className="min-h-8 text-cream-2 underline-offset-4 hover:text-cream hover:underline"
+          >
+            {invoice.reminders_paused ? "Turn them back on" : "Stop them"}
+          </button>
+        </p>
+      )}
+
+      {creditNotes.length > 0 && (
+        <div className="no-print mb-5 border border-cream/[0.08] bg-cream/[0.02] px-4 py-3">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-sand">
+            Credit notes · {money(issuedCredits.reduce((a, c) => a + num(c.total), 0))} applied
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+            {creditNotes.map((c) => (
+              <li key={c.id}>
+                <Link href={`/admin/invoices/${c.id}`} className="inline-flex min-h-8 items-center gap-1.5 text-[12px] text-cream-2 hover:text-terra-bright">
+                  <span className="font-mono">{c.number ?? "Draft"}</span>
+                  <span className="text-sand">
+                    {docMoney(num(c.total), invoice.currency)} · {c.status === "issued" ? "applied" : c.status}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <Tabs className="no-print mb-4" value={tab} onChange={setTab} options={tabs} />
 
@@ -253,23 +396,24 @@ export default function InvoiceDetail({
           <div className="mx-auto max-w-[820px] print:max-w-none">
             <ScaledSheet>
               <InvoiceDocument
-                doc={documentFromRow(invoice, items)}
+                doc={documentFromRow(invoice, items, creditedNumber ? { number: creditedNumber } : null)}
                 business={business}
+                branding={branding}
                 today={today}
-                className="shadow-[0_40px_100px_-40px_rgba(0,0,0,0.95)]"
+                className="shadow-[0_40px_100px_-40px_var(--shadow-deep)]"
               />
             </ScaledSheet>
           </div>
         </div>
       )}
 
-      {tab === "payments" && !quote && (
+      {tab === "payments" && !quote && !credit && (
         <Panel
           title="Payments"
           hint="Each payment is an income entry in Expenses, in LKR. Remove one to take it back."
           right={
             canPay ? (
-              <Button variant="primary" onClick={() => setPaying(true)} className="min-h-9">
+              <Button variant="primary" onClick={() => setPaying("payment")} className="min-h-9">
                 <Icon.plus size={13} /> Record payment
               </Button>
             ) : undefined
@@ -296,7 +440,7 @@ export default function InvoiceDetail({
                   <div className="min-w-0">
                     <p className="text-[13px] text-cream">
                       {formatDate(p.paid_on)}
-                      <span className="text-sand"> · {p.method || "Payment"}</span>
+                      <span className="text-sand"> · {p.kind === "refund" ? `Refund${p.method ? ` · ${p.method}` : ""}` : p.method || "Payment"}</span>
                     </p>
                     <p className="mt-0.5 truncate text-[11.5px] text-sand">
                       {[p.reference && `Ref ${p.reference}`, p.note, p.created_by && names[p.created_by] && `Recorded by ${names[p.created_by]}`]
@@ -305,10 +449,14 @@ export default function InvoiceDetail({
                     </p>
                   </div>
                   <div className="flex shrink-0 items-start gap-2">
-                    <p className="text-right font-mono text-[12.5px] text-emerald-300 tabular-nums">
-                      +{money(num(p.amount))}
+                    <p className={`text-right font-mono text-[12.5px] tabular-nums ${p.kind === "refund" ? "text-bad-300" : "text-ok-300"}`}>
+                      {p.kind === "refund" ? "−" : "+"}
+                      {money(num(p.amount))}
                       {invoice.currency.toUpperCase() !== "LKR" && (
-                        <span className="block text-[10.5px] text-sand">{docMoney(num(p.amount_base), "LKR")} in Income</span>
+                        <span className="block text-[10.5px] text-sand">
+                          {p.kind === "refund" ? "−" : ""}
+                          {docMoney(num(p.amount_base), "LKR")} in Income
+                        </span>
                       )}
                     </p>
                     <button
@@ -316,11 +464,11 @@ export default function InvoiceDetail({
                       disabled={pending}
                       aria-label="Remove payment"
                       onClick={() => {
-                        if (confirm(`Remove this ${money(num(p.amount))} payment? Its income entry leaves Expenses too.`)) {
+                        if (confirm(`Remove this ${money(num(p.amount))} ${p.kind === "refund" ? "refund" : "payment"}? Its line leaves Income too.`)) {
                           run(() => deletePayment(p.id));
                         }
                       }}
-                      className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-rose-300 disabled:opacity-40"
+                      className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-bad-300 disabled:opacity-40"
                     >
                       <Icon.trash size={14} />
                     </button>
@@ -348,11 +496,12 @@ export default function InvoiceDetail({
         <PaymentDialog
           invoice={invoice}
           full={false}
+          refund={paying === "refund"}
           today={today}
           pending={pending}
           onClose={() => setPaying(false)}
           onSubmit={(fd) =>
-            run(() => recordPayment(invoice.id, fd), {
+            run(() => (paying === "refund" ? recordRefund(invoice.id, fd) : recordPayment(invoice.id, fd)), {
               onDone: (r) => r.ok && setPaying(false),
             })
           }
@@ -371,6 +520,7 @@ function RelatedLine({ related }: { related: RelatedLinks }) {
   if (related.sourceQuote) parts.push({ href: hrefFor("quote", related.sourceQuote.id), label: `From ${related.sourceQuote.label}` });
   if (related.converted) parts.push({ href: hrefFor("invoice", related.converted.id), label: `Invoiced as ${related.converted.label}` });
   if (related.schedule) parts.push({ href: hrefFor("schedule", related.schedule.id), label: `Recurring · ${related.schedule.label}` });
+  if (related.credited) parts.push({ href: hrefFor("invoice", related.credited.id), label: `Credits ${related.credited.label}` });
   if (parts.length === 0) return null;
   return (
     <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px]">
@@ -419,18 +569,18 @@ function Trail({
           text: a.actor_id ? a.summary : `Automatically ${a.summary}`,
         }))
       : [
-          { key: "created", at: invoice.created_at, actor: who(invoice.created_by), text: `created this ${invoice.kind}` },
+          { key: "created", at: invoice.created_at, actor: who(invoice.created_by), text: `created this ${KIND_LABEL[invoice.kind].toLowerCase()}` },
           invoice.issued_at && {
             key: "issued",
             at: invoice.issued_at,
             actor: null,
-            text: invoice.kind === "quote" ? `Sent as ${invoice.number}` : `Issued as ${invoice.number}`,
+            text: invoice.kind === "quote" ? `Sent as ${invoice.number}` : invoice.kind === "credit_note" ? `Applied as ${invoice.number}` : `Issued as ${invoice.number}`,
           },
           ...payments.map((p) => ({
             key: `p${p.id}`,
             at: p.created_at,
             actor: who(p.created_by),
-            text: `recorded a payment of ${docMoney(num(p.amount), invoice.currency)}`,
+            text: `recorded a ${p.kind === "refund" ? "refund" : "payment"} of ${docMoney(num(p.amount), invoice.currency)}`,
           })),
           invoice.paid_at && { key: "paid", at: invoice.paid_at, actor: null, text: "Paid in full" },
           invoice.accepted_at && { key: "accepted", at: invoice.accepted_at, actor: null, text: "Accepted by the client" },

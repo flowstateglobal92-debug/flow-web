@@ -4,17 +4,31 @@ import { requireModule } from "@/lib/admin/auth";
 import { formatDateShort, num, todayISO } from "@/lib/admin/format";
 import { canAccess, isApprover } from "@/lib/admin/modules";
 import { displayName } from "@/lib/admin/team";
-import { Panel } from "@/components/admin/ui";
+import { Notice, Panel } from "@/components/admin/ui";
 import InvoiceEditor from "@/components/admin/invoice/InvoiceEditor";
+import { linkButton } from "@/components/admin/invoice/parts";
 import {
   billedTo,
   blankEditorDoc,
+  canCredit,
+  creditNoteFromInvoice,
+  docLabel,
   docMoney,
+  lineTax,
   type ClientOption,
   type Invoice,
   type LeadOption,
 } from "@/lib/admin/invoice-types";
-import { loadClients, loadInvoicePeople, loadLeads, loadSettings, runRecurring } from "../data";
+import {
+  creditRoom,
+  loadClients,
+  loadDocument,
+  loadEditorExtras,
+  loadInvoicePeople,
+  loadLeads,
+  loadSettings,
+  runRecurring,
+} from "../data";
 
 export const metadata: Metadata = { title: "Create invoice" };
 
@@ -28,22 +42,65 @@ type DraftRow = Pick<Invoice, "id" | "kind" | "bill_to_name" | "bill_to_company"
 export default async function NewInvoicePage({
   searchParams,
 }: {
-  searchParams: Promise<{ kind?: string; client?: string; lead?: string; recurring?: string }>;
+  searchParams: Promise<{ kind?: string; client?: string; lead?: string; recurring?: string; credit?: string }>;
 }) {
   const { supabase, profile } = await requireModule("invoices");
   const sp = await searchParams;
   const today = todayISO();
   const kind = sp.kind === "quote" ? "quote" : "invoice";
 
+  // ?credit=<invoice id>: a credit note against that invoice.
+  if (sp.credit) {
+    const bundle = await loadDocument(supabase, sp.credit);
+    const back = sp.credit ? `/admin/invoices/${sp.credit}` : "/admin/invoices";
+    if (!bundle || !canCredit(bundle.invoice)) {
+      return (
+        <div className="max-w-xl space-y-4">
+          <Notice tone="warn" title="Nothing to credit">
+            {bundle
+              ? `${docLabel(bundle.invoice)} isn't an issued invoice with anything left to credit.`
+              : "That invoice isn't available."}
+          </Notice>
+          <Link href={back} className={linkButton.ghost}>
+            Back
+          </Link>
+        </div>
+      );
+    }
+    const [settings, clients, owners, extras] = await Promise.all([
+      loadSettings(supabase, profile.workspace),
+      loadClients(supabase),
+      loadInvoicePeople(supabase, profile),
+      loadEditorExtras(supabase),
+    ]);
+    const { invoice, items } = bundle;
+    return (
+      <InvoiceEditor
+        key={`credit:${invoice.id}`}
+        mode="create"
+        initial={creditNoteFromInvoice(invoice, items, settings, today, profile.id)}
+        settings={settings}
+        clients={clients}
+        leads={[]}
+        owners={owners.map((o) => ({ id: o.id, name: displayName(o) }))}
+        viewer={{ id: profile.id, admin: isApprover(profile), canClients: false }}
+        today={today}
+        {...extras}
+        creditFor={{ id: invoice.id, number: invoice.number, currency: invoice.currency, room: creditRoom(invoice) }}
+      />
+    );
+  }
+
   await runRecurring(supabase);
 
   const draftCount = (k: "invoice" | "quote") =>
     supabase.from("invoices").select("id", { count: "exact", head: true }).eq("status", "draft").eq("kind", k);
-  const [settings, clients, leads, owners, { data: drafts }, { count: invoiceDrafts }, { count: quoteDrafts }] = await Promise.all([
+  const [settings, clients, leads, owners, extras, { data: drafts }, { count: invoiceDrafts }, { count: quoteDrafts }] = await Promise.all([
     loadSettings(supabase, profile.workspace),
     loadClients(supabase),
     loadLeads(supabase, profile),
     loadInvoicePeople(supabase, profile),
+    loadEditorExtras(supabase),
     supabase
       .from("invoices")
       .select("id, kind, bill_to_name, bill_to_company, subject, total, currency, updated_at")
@@ -81,7 +138,7 @@ export default async function NewInvoicePage({
       (
         await supabase
           .from("clients")
-          .select("id, name, company, email, phone, address, city, country")
+          .select("id, name, company, email, phone, address, city, country, tax_id")
           .eq("id", clientId)
           .maybeSingle<ClientOption>()
       ).data;
@@ -137,7 +194,14 @@ export default async function NewInvoicePage({
         // a refresh after saving keeps the one being typed in.
         key={[kind, sp.client, sp.lead, sp.recurring].join(":")}
         mode="create"
-        initial={blankEditorDoc(settings, { kind, today, ownerId: profile.id, client, lead })}
+        initial={blankEditorDoc(settings, {
+          kind,
+          today,
+          ownerId: profile.id,
+          client,
+          lead,
+          defaultTaxes: extras.taxRates.filter((r) => r.active && r.is_default).map(lineTax),
+        })}
         startRecurring={sp.recurring === "1" && kind === "invoice"}
         settings={settings}
         clients={client && !clients.some((c) => c.id === client.id) ? [client, ...clients] : clients}
@@ -145,6 +209,7 @@ export default async function NewInvoicePage({
         owners={owners.map((o) => ({ id: o.id, name: displayName(o) }))}
         viewer={{ id: profile.id, admin: isApprover(profile), canClients: canAccess(profile, "clients") }}
         today={today}
+        {...extras}
       />
     </>
   );

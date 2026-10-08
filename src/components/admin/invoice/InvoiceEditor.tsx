@@ -8,15 +8,22 @@ import { Icon } from "@/components/admin/icons";
 import { useAction } from "@/components/admin/useAction";
 import { Button, Checkbox, Field, Input, Notice, Panel, Select, Textarea, labelClass } from "@/components/admin/ui";
 import { addDays, num } from "@/lib/admin/format";
-import { computeTotals } from "@/lib/admin/invoice-math";
+import { computeTotals, type TaxInput } from "@/lib/admin/invoice-math";
 import {
+  CREDIT_REASONS,
   CURRENCIES,
   FREQUENCIES,
   addPeriods,
+  blankItem,
+  brandingFrom,
   businessFrom,
+  cataloguePrice,
   clientAddress,
   docMoney,
+  lineTax,
+  type CatalogueItem,
   type ClientOption,
+  type CreditReason,
   type DocStatus,
   type DocumentData,
   type DocumentInput,
@@ -27,10 +34,12 @@ import {
   type LeadOption,
   type ScheduleDraft,
   type ScheduleInput,
+  type TaxRate,
 } from "@/lib/admin/invoice-types";
 import { saveDocument, saveScheduleTemplate } from "@/app/admin/actions/invoices";
 import InvoiceDocument from "./InvoiceDocument";
 import ScaledSheet from "./ScaledSheet";
+import { CataloguePicker, LineTaxes } from "./LineExtras";
 import { linkButton } from "./parts";
 
 /**
@@ -67,6 +76,14 @@ type Props = {
   owners: { id: string; name: string }[];
   viewer: { id: string; admin: boolean; canClients: boolean };
   today: string;
+  /** The workspace's tax rates (0032) — what a line can carry. */
+  taxRates?: TaxRate[];
+  /** Saved products and services (0034). */
+  catalogue?: CatalogueItem[];
+  /** The last rate used per currency, to pre-fill a foreign document's. */
+  lastRates?: Record<string, number>;
+  /** A credit note: the invoice it credits and what's left to credit on it. */
+  creditFor?: { id: string; number: string | null; currency: string; room: number } | null;
 };
 
 const DUE_TERMS = [0, 7, 14, 30, 45];
@@ -87,6 +104,10 @@ export default function InvoiceEditor({
   owners,
   viewer,
   today,
+  taxRates = [],
+  catalogue = [],
+  lastRates = {},
+  creditFor = null,
 }: Props) {
   const router = useRouter();
   const { run, pending, toast } = useAction();
@@ -128,6 +149,10 @@ export default function InvoiceEditor({
   }
 
   const quote = doc.kind === "quote";
+  const credit = doc.kind === "credit_note";
+  const foreign = doc.currency !== "LKR";
+  const activeRates = taxRates.filter((r) => r.active);
+  const defaultTaxes = activeRates.filter((r) => r.is_default).map(lineTax);
   const paid = num(invoice?.amount_paid);
   const locked = paid > 0;
   const status: DocStatus = invoice?.status ?? "draft";
@@ -135,10 +160,19 @@ export default function InvoiceEditor({
   const id = invoice?.id;
 
   const totals = useMemo(
-    () => computeTotals({ items, discount_type: doc.discount_type, discount_value: doc.discount_value, tax_rate: doc.tax_rate }),
-    [items, doc.discount_type, doc.discount_value, doc.tax_rate],
+    () =>
+      computeTotals({
+        items,
+        discount_type: doc.discount_type,
+        discount_value: doc.discount_value,
+        tax_rate: doc.tax_rate,
+        tax_label: doc.tax_label,
+        prices_include_tax: doc.prices_include_tax,
+      }),
+    [items, doc.discount_type, doc.discount_value, doc.tax_rate, doc.tax_label, doc.prices_include_tax],
   );
   const belowPaid = locked && totals.total < paid;
+  const overCredit = credit && creditFor ? totals.total > creditFor.room + 0.004 : false;
 
   const set = <K extends keyof EditorDoc>(key: K, value: EditorDoc[K]) => setDoc((d) => ({ ...d, [key]: value }));
 
@@ -159,7 +193,17 @@ export default function InvoiceEditor({
     bill_to_email: c.email ?? "",
     bill_to_phone: c.phone ?? "",
     bill_to_address: clientAddress(c),
+    bill_to_tax_id: c.tax_id ?? "",
   });
+
+  /* ── currency ── */
+  const setCurrency = (currency: string) =>
+    setDoc((d) => ({
+      ...d,
+      currency,
+      // A rupee document carries no rate; a foreign one starts from the last rate used.
+      exchange_rate: currency === "LKR" ? "" : d.exchange_rate || (lastRates[currency] ? String(lastRates[currency]) : ""),
+    }));
 
   const pickClient = (clientId: string) => {
     const c = clients.find((x) => x.id === clientId);
@@ -187,16 +231,35 @@ export default function InvoiceEditor({
   /* ── line items ── */
   const updateItem = (key: string, patch: Partial<Item>) =>
     setItems((list) => list.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+  // A new line carries the taxes the lines above use (or the workspace defaults).
+  const taxesForNewLine = (list: Item[]): TaxInput[] => {
+    const last = list[list.length - 1];
+    return last && last.taxes.length ? last.taxes : defaultTaxes;
+  };
   const addItem = () => {
-    setItems((list) => [...list, { key: `n${seq}`, description: "", details: "", quantity: "1", unit_price: "", open: false }]);
+    setItems((list) => [...list, { ...blankItem(taxesForNewLine(list)), key: `n${seq}`, open: false }]);
     setSeq(seq + 1);
   };
   const removeItem = (key: string) =>
     setItems((list) =>
       list.length > 1
         ? list.filter((it) => it.key !== key)
-        : list.map((it) => ({ ...it, description: "", details: "", quantity: "1", unit_price: "", open: false })),
+        : list.map((it) => ({ ...it, ...blankItem(defaultTaxes), open: false })),
     );
+  const fromCatalogue = (key: string, entry: CatalogueItem) => {
+    const price = cataloguePrice(entry, doc.currency);
+    const taxes = (entry.tax_rate_ids ?? [])
+      .map((rid) => taxRates.find((r) => r.id === rid))
+      .filter((r): r is TaxRate => !!r)
+      .map(lineTax);
+    updateItem(key, {
+      description: entry.name,
+      details: entry.details ?? "",
+      open: !!entry.details,
+      unit_price: price == null ? "" : String(price),
+      taxes,
+    });
+  };
   const moveItem = (key: string, by: -1 | 1) =>
     setItems((list) => {
       const from = list.findIndex((it) => it.key === key);
@@ -246,15 +309,23 @@ export default function InvoiceEditor({
     discount_type: doc.discount_type,
     discount_value: num(doc.discount_value),
     tax_label: doc.tax_label,
-    tax_rate: num(doc.tax_rate),
+    // Lines carry the taxes now (0032); the document-wide rate stays at zero.
+    tax_rate: 0,
     notes: doc.notes || null,
     terms: doc.terms || null,
     payment_details: doc.payment_details || null,
+    exchange_rate: foreign && num(doc.exchange_rate) > 0 ? num(doc.exchange_rate) : null,
+    prices_include_tax: doc.prices_include_tax,
+    supply_date: doc.supply_date || null,
+    bill_to_tax_id: doc.bill_to_tax_id.trim() || null,
+    credited_invoice_id: credit ? doc.credited_invoice_id || null : null,
+    credit_reason: credit ? (doc.credit_reason || "other") : null,
     items: items.map((it) => ({
       description: it.description,
       details: it.details || null,
       quantity: num(it.quantity),
       unit_price: num(it.unit_price),
+      taxes: it.taxes,
     })),
   });
 
@@ -263,8 +334,8 @@ export default function InvoiceEditor({
       run(() => saveScheduleTemplate(schedule.id, toInput(), scheduleInput()));
       return;
     }
-    const withSchedule = recurring && !quote;
-    run(() => saveDocument(toInput(), { issue, recurring: withSchedule ? scheduleInput() : null, saveClient: saveClient && !locked }), {
+    const withSchedule = recurring && !quote && !credit;
+    run(() => saveDocument(toInput(), { issue, recurring: withSchedule ? scheduleInput() : null, saveClient: saveClient && !locked && !credit }), {
       onDone: (r) => {
         if (!r.id) return;
         if (r.ok && (issue || !isDraft)) {
@@ -286,7 +357,14 @@ export default function InvoiceEditor({
   /* ── preview ── */
   const dueDays = settings.default_due_days;
   const previewItems = useMemo(
-    () => items.map((it) => ({ description: it.description, details: it.details || null, quantity: it.quantity, unit_price: it.unit_price })),
+    () =>
+      items.map((it) => ({
+        description: it.description,
+        details: it.details || null,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        taxes: it.taxes,
+      })),
     [items],
   );
   const preview = useMemo<DocumentData>(() => ({
@@ -300,7 +378,7 @@ export default function InvoiceEditor({
     bill_to_address: doc.bill_to_address || null,
     subject: doc.subject || null,
     issue_date: mode === "schedule" ? nextRun || today : isDay(doc.issue_date) ? doc.issue_date : today,
-    due_date: quote ? null : mode === "schedule" ? addDays(nextRun || today, dueDays) : isDay(doc.due_date) ? doc.due_date : null,
+    due_date: quote || credit ? null : mode === "schedule" ? addDays(nextRun || today, dueDays) : isDay(doc.due_date) ? doc.due_date : null,
     valid_until: quote && isDay(doc.valid_until) ? doc.valid_until : null,
     currency: doc.currency,
     discount_type: doc.discount_type,
@@ -313,10 +391,18 @@ export default function InvoiceEditor({
     items: previewItems,
     amount_paid: paid,
     paid_at: invoice?.paid_at ?? null,
-  }), [doc, quote, status, mode, nextRun, today, dueDays, previewItems, paid, invoice?.number, invoice?.paid_at]);
+    exchange_rate: foreign && num(doc.exchange_rate) > 0 ? num(doc.exchange_rate) : null,
+    prices_include_tax: doc.prices_include_tax,
+    supply_date: isDay(doc.supply_date) ? doc.supply_date : null,
+    bill_to_tax_id: doc.bill_to_tax_id || null,
+    credited_number: creditFor?.number ?? null,
+    credit_reason: credit ? (doc.credit_reason || null) : null,
+  }), [doc, quote, credit, foreign, status, mode, nextRun, today, dueDays, previewItems, paid, invoice?.number, invoice?.paid_at, creditFor?.number]);
   // Typing stays instant; the paper catches up a frame later on slow devices.
   const shown = useDeferredValue(preview);
   const business = businessFrom(settings);
+  const branding = brandingFrom(settings);
+  const taxInvoice = !!settings.tax_registered;
   const totalText = docMoney(totals.total, doc.currency);
 
   useEffect(() => {
@@ -336,7 +422,14 @@ export default function InvoiceEditor({
   const hasOwner = owners.some((o) => o.id === doc.owner_id);
   const hasClient = clients.some((c) => c.id === doc.client_id);
   const hasLead = leads.some((l) => l.id === doc.lead_id);
-  const cancelHref = mode === "schedule" ? "/admin/invoices/recurring" : id ? `/admin/invoices/${id}` : "/admin/invoices";
+  const cancelHref =
+    mode === "schedule"
+      ? "/admin/invoices/recurring"
+      : id
+        ? `/admin/invoices/${id}`
+        : creditFor
+          ? `/admin/invoices/${creditFor.id}`
+          : "/admin/invoices";
 
   return (
     <>
@@ -361,6 +454,12 @@ export default function InvoiceEditor({
               Check the lines and dates, then issue it.
             </Notice>
           )}
+          {credit && creditFor && (
+            <Notice tone="info" title={`Credit note for ${creditFor.number ?? "an invoice"}`}>
+              Issuing it takes its total off the invoice — up to {docMoney(creditFor.room, creditFor.currency)} is left to
+              credit. If the client has already paid, record the refund on the invoice afterwards.
+            </Notice>
+          )}
           {mode === "schedule" && (
             <Notice tone="info" title="Editing a recurring template">
               Each run copies these lines into a new invoice dated on the run day, due {settings.default_due_days} days later.
@@ -369,9 +468,9 @@ export default function InvoiceEditor({
           )}
 
           {/* Document */}
-          <Panel title={mode === "schedule" ? "Template" : quote ? "Quote" : "Invoice"} hint={headHint(mode, quote)}>
+          <Panel title={mode === "schedule" ? "Template" : credit ? "Credit note" : quote ? "Quote" : "Invoice"} hint={headHint(mode, quote, credit)}>
             <div className="space-y-3">
-              {mode === "create" && (
+              {mode === "create" && !credit && (
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Document type">
                   {(["invoice", "quote"] as const).map((k) => (
                     <button
@@ -415,8 +514,11 @@ export default function InvoiceEditor({
                     <Input type="date" value={doc.issue_date} onChange={(e) => setIssueDate(e.target.value)} required />
                   </Field>
                 )}
-                <Field label="Currency" hint={locked ? "Locked — a payment is recorded." : undefined}>
-                  <Select value={doc.currency} disabled={locked} onChange={(e) => set("currency", e.target.value)}>
+                <Field
+                  label="Currency"
+                  hint={credit ? "The invoice's currency." : locked ? "Locked — a payment is recorded." : undefined}
+                >
+                  <Select value={doc.currency} disabled={locked || credit} onChange={(e) => setCurrency(e.target.value)}>
                     {(CURRENCIES.includes(doc.currency) ? CURRENCIES : [doc.currency, ...CURRENCIES]).map((c) => (
                       <option key={c} value={c} className="bg-ink text-cream">
                         {c}
@@ -424,9 +526,47 @@ export default function InvoiceEditor({
                     ))}
                   </Select>
                 </Field>
+                {foreign && (
+                  <Field
+                    label={`Rate · LKR per 1 ${doc.currency}`}
+                    hint={taxInvoice ? "The Central Bank's selling rate on the invoice date." : "Counts it in rupees in the totals and reports."}
+                  >
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.0001"
+                      value={doc.exchange_rate}
+                      onChange={(e) => set("exchange_rate", e.target.value)}
+                      placeholder={lastRates[doc.currency] ? String(lastRates[doc.currency]) : "e.g. 299.50"}
+                      className="font-mono tabular-nums"
+                    />
+                  </Field>
+                )}
+                {credit && (
+                  <Field label="Reason">
+                    <Select value={doc.credit_reason || "other"} onChange={(e) => set("credit_reason", e.target.value as CreditReason)}>
+                      {doc.credit_reason === "write_off" && (
+                        <option value="write_off" className="bg-ink text-cream">
+                          Bad debt written off
+                        </option>
+                      )}
+                      {CREDIT_REASONS.map((r) => (
+                        <option key={r.value} value={r.value} className="bg-ink text-cream">
+                          {r.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
+                {taxInvoice && !quote && mode !== "schedule" && (
+                  <Field label="Date of supply" hint="Leave empty when it's the issue date.">
+                    <Input type="date" value={doc.supply_date} onChange={(e) => set("supply_date", e.target.value)} />
+                  </Field>
+                )}
               </div>
 
-              {mode !== "schedule" && (
+              {mode !== "schedule" && !credit && (
                 <div>
                   <span className={labelClass}>{quote ? "Valid until" : "Due date"}</span>
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -471,8 +611,11 @@ export default function InvoiceEditor({
           <Panel title={quote ? "Prepared for" : "Bill to"} hint="Pick a client to fill this in, or type it.">
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
-                <Field label="Client" hint={locked ? "Locked — a payment is recorded." : clients.length === 0 ? "No clients to pick from yet." : undefined}>
-                  <Select value={doc.client_id} disabled={locked} onChange={(e) => pickClient(e.target.value)}>
+                <Field
+                  label="Client"
+                  hint={credit ? "The invoice's client." : locked ? "Locked — a payment is recorded." : clients.length === 0 ? "No clients to pick from yet." : undefined}
+                >
+                  <Select value={doc.client_id} disabled={locked || credit} onChange={(e) => pickClient(e.target.value)}>
                     <option value="" className="bg-ink text-cream">
                       — Not linked —
                     </option>
@@ -522,13 +665,18 @@ export default function InvoiceEditor({
                 <Field label="Phone">
                   <Input type="tel" value={doc.bill_to_phone} onChange={(e) => set("bill_to_phone", e.target.value)} />
                 </Field>
+                {(taxInvoice || doc.bill_to_tax_id) && (
+                  <Field label="Their TIN / VAT no." hint="Prints on tax invoices when the client is VAT-registered.">
+                    <Input value={doc.bill_to_tax_id} onChange={(e) => set("bill_to_tax_id", e.target.value)} maxLength={40} />
+                  </Field>
+                )}
               </div>
               <Field label="Address">
                 <Textarea rows={3} value={doc.bill_to_address} onChange={(e) => set("bill_to_address", e.target.value)} />
               </Field>
 
               {/* Not once a payment locks the client — the save would be refused. */}
-              {mode !== "schedule" && !doc.client_id && !locked && viewer.canClients && (
+              {mode !== "schedule" && !credit && !doc.client_id && !locked && viewer.canClients && (
                 <Checkbox
                   checked={saveClient}
                   onChange={(e) => setSaveClient(e.target.checked)}
@@ -567,15 +715,21 @@ export default function InvoiceEditor({
                           placeholder="Details — scope, dates, deliverables"
                           aria-label={`Line ${i + 1} details`}
                         />
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => updateItem(it.key, { open: true })}
-                          className="min-h-8 text-[11.5px] text-sand transition-colors hover:text-cream pointer-coarse:min-h-9"
-                        >
-                          + Add details
-                        </button>
-                      )}
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        {!it.open && (
+                          <button
+                            type="button"
+                            onClick={() => updateItem(it.key, { open: true })}
+                            className="min-h-8 text-[11.5px] text-sand transition-colors hover:text-cream pointer-coarse:min-h-9"
+                          >
+                            + Add details
+                          </button>
+                        )}
+                        {catalogue.length > 0 && (
+                          <CataloguePicker items={catalogue} currency={doc.currency} onPick={(entry) => fromCatalogue(it.key, entry)} />
+                        )}
+                      </div>
                       {/* Narrow: qty + rate, amount on its own line. Wide enough: one row of three. */}
                       <div className="grid grid-cols-[minmax(0,0.75fr)_minmax(0,1.25fr)] gap-2 @sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1.1fr)_minmax(0,1.2fr)]">
                         <label className="min-w-0">
@@ -610,6 +764,14 @@ export default function InvoiceEditor({
                           </p>
                         </div>
                       </div>
+                      {(activeRates.length > 0 || it.taxes.length > 0) && (
+                        <LineTaxes
+                          taxes={it.taxes}
+                          rates={activeRates}
+                          onChange={(taxes) => updateItem(it.key, { taxes })}
+                          label={`Line ${i + 1}`}
+                        />
+                      )}
                     </div>
                     <div className="flex shrink-0 flex-col gap-1">
                       <IconButton label={`Move line ${i + 1} up`} disabled={i === 0} onClick={() => moveItem(it.key, -1)}>
@@ -663,44 +825,68 @@ export default function InvoiceEditor({
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2">
-                <Field label="Tax label">
-                  <Input value={doc.tax_label} onChange={(e) => set("tax_label", e.target.value)} placeholder="VAT" />
-                </Field>
-                <Field label="Rate %">
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={doc.tax_rate}
-                    onChange={(e) => set("tax_rate", e.target.value)}
-                    placeholder="0"
-                    className="font-mono tabular-nums"
-                  />
-                </Field>
+              <div>
+                <span className={labelClass}>Line prices</span>
+                <div className="grid grid-cols-2 border border-cream/12" role="radiogroup" aria-label="Line prices">
+                  {([false, true] as const).map((inc) => (
+                    <button
+                      key={String(inc)}
+                      type="button"
+                      role="radio"
+                      aria-checked={doc.prices_include_tax === inc}
+                      onClick={() => set("prices_include_tax", inc)}
+                      className={`min-h-9 px-3 text-[12px] transition-colors ${doc.prices_include_tax === inc ? "bg-terra/15 text-terra-bright" : "text-sand hover:text-cream"}`}
+                    >
+                      {inc ? "Include tax" : "Before tax"}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+            {activeRates.length === 0 && totals.taxes.length === 0 && (
+              <p className="mt-2.5 text-[11.5px] text-sand">
+                No tax on this document.{" "}
+                {viewer.admin ? "Add VAT, SSCL or other rates under Invoice settings › Taxes." : "An admin adds tax rates in Invoice settings."}
+              </p>
+            )}
 
             <dl className="mt-4 space-y-1.5 border-t border-cream/[0.08] pt-3 text-[12.5px]">
               <TotalRow term="Subtotal" value={docMoney(totals.subtotal, doc.currency)} />
               {totals.discount > 0 && <TotalRow term="Discount" value={`−${docMoney(totals.discount, doc.currency)}`} />}
-              {totals.tax > 0 && <TotalRow term={doc.tax_label || "Tax"} value={docMoney(totals.tax, doc.currency)} />}
+              {doc.prices_include_tax && totals.tax > 0 && (
+                <TotalRow term="Value before tax" value={docMoney(totals.net, doc.currency)} />
+              )}
+              {totals.taxes.map((t) => (
+                <TotalRow
+                  key={`${t.name}${t.rate}${t.compound}`}
+                  term={`${t.name} ${t.rate}%${doc.prices_include_tax ? " (included)" : ""}`}
+                  value={docMoney(t.amount, doc.currency)}
+                />
+              ))}
               <div className="flex items-baseline justify-between gap-3 border-t border-cream/[0.08] pt-2">
                 <dt className="font-display text-[14px] text-cream">Total</dt>
                 <dd className="font-mono text-[15px] text-terra-bright tabular-nums">{totalText}</dd>
               </div>
             </dl>
             {belowPaid && (
-              <p className="mt-2 text-[12px] text-rose-300">
+              <p className="mt-2 text-[12px] text-bad-300">
                 The total can&apos;t drop below the {docMoney(paid, doc.currency)} already paid — remove a payment first.
+              </p>
+            )}
+            {overCredit && creditFor && (
+              <p className="mt-2 text-[12px] text-bad-300">
+                That&apos;s more than the {docMoney(creditFor.room, creditFor.currency)} left to credit on {creditFor.number ?? "the invoice"}.
+              </p>
+            )}
+            {foreign && num(doc.exchange_rate) > 0 && (
+              <p className="mt-2 text-[11.5px] text-sand">
+                ≈ {docMoney(Math.round(totals.total * num(doc.exchange_rate) * 100) / 100, "LKR")} at {num(doc.exchange_rate)}
               </p>
             )}
           </Panel>
 
           {/* Notes & payment */}
-          <Panel title="Notes & payment" hint="Pre-filled from invoice settings. Edit for this document only.">
+          <Panel title={credit ? "Notes" : "Notes & payment"} hint="Pre-filled from invoice settings. Edit for this document only.">
             <div className="space-y-3">
               <Field label="Payment details" hint="Bank and account — prints on a tinted panel.">
                 <Textarea
@@ -722,7 +908,7 @@ export default function InvoiceEditor({
           </Panel>
 
           {/* Recurring */}
-          {!quote && !invoice?.scheduled && (
+          {!quote && !credit && !invoice?.scheduled && (
             <Panel
               title={mode === "schedule" ? "Schedule" : "Make recurring"}
               hint={mode === "schedule" ? "How often it runs and what each run does." : "Retainers and subscriptions — this invoice is the first, the rest follow on schedule."}
@@ -733,7 +919,7 @@ export default function InvoiceEditor({
                       type="checkbox"
                       checked={recurring}
                       onChange={(e) => setRecurring(e.target.checked)}
-                      className="h-4 w-4 accent-[#c65d3b]"
+                      className="h-4 w-4 accent-terra"
                     />
                     Repeat
                   </label>
@@ -858,10 +1044,10 @@ export default function InvoiceEditor({
             ) : isDraft ? (
               <>
                 <Button disabled={pending} onClick={() => save(false)} className="min-h-9">
-                  {recurring && !quote ? "Save draft & schedule" : "Save draft"}
+                  {recurring && !quote && !credit ? "Save draft & schedule" : "Save draft"}
                 </Button>
-                <Button variant="primary" disabled={pending} onClick={() => save(true)} className="min-h-9">
-                  <Icon.send size={13} /> {quote ? "Save & mark sent" : "Save & issue"}
+                <Button variant="primary" disabled={pending || overCredit} onClick={() => save(true)} className="min-h-9">
+                  <Icon.send size={13} /> {quote ? "Save & mark sent" : credit ? "Save & apply" : "Save & issue"}
                 </Button>
               </>
             ) : (
@@ -896,7 +1082,13 @@ export default function InvoiceEditor({
               <p className="font-mono text-[11px] text-sand tabular-nums">{totalText}</p>
             </div>
             <ScaledSheet fitHeight offset={84}>
-              <InvoiceDocument doc={shown} business={business} today={today} className="shadow-[0_40px_100px_-40px_rgba(0,0,0,0.95)]" />
+              <InvoiceDocument
+                doc={shown}
+                business={business}
+                branding={branding}
+                today={today}
+                className="shadow-[0_40px_100px_-40px_var(--shadow-deep)]"
+              />
             </ScaledSheet>
           </div>
         </aside>
@@ -921,7 +1113,7 @@ export default function InvoiceEditor({
             </header>
             <div className="flex-1 overflow-y-auto p-4 scroll-thin" data-lenis-prevent data-modal>
               <ScaledSheet>
-                <InvoiceDocument doc={shown} business={business} today={today} />
+                <InvoiceDocument doc={shown} business={business} branding={branding} today={today} />
               </ScaledSheet>
             </div>
           </div>,
@@ -932,8 +1124,9 @@ export default function InvoiceEditor({
   );
 }
 
-function headHint(mode: Props["mode"], quote: boolean) {
+function headHint(mode: Props["mode"], quote: boolean, credit: boolean) {
   if (mode === "schedule") return "The bill-to and lines every run copies.";
+  if (credit) return "Numbered and applied to the invoice when you issue it. Trim the lines to credit part of it.";
   if (quote) return "Numbered when you mark it sent. Convert it to an invoice once accepted.";
   return "Numbered when you issue it. Drafts stay editable and unnumbered.";
 }
@@ -967,7 +1160,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`flex h-9 w-9 items-center justify-center border border-cream/[0.08] text-sand transition-colors disabled:opacity-30 ${danger ? "hover:border-rose-400/40 hover:text-rose-300" : "hover:border-cream/25 hover:text-cream"}`}
+      className={`flex h-9 w-9 items-center justify-center border border-cream/[0.08] text-sand transition-colors disabled:opacity-30 ${danger ? "hover:border-bad-400/40 hover:text-bad-300" : "hover:border-cream/25 hover:text-cream"}`}
     >
       {children}
     </button>

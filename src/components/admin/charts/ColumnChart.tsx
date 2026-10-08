@@ -220,7 +220,7 @@ export default function ColumnChart({
 
         {active !== null && (
           <div
-            className="pointer-events-none absolute top-1 z-10 w-[172px] border border-cream/15 bg-ink-2/95 px-3 py-2 shadow-[0_18px_40px_-18px_rgba(0,0,0,0.9)] print:hidden"
+            className="pointer-events-none absolute top-1 z-10 w-[172px] border border-cream/15 bg-ink-2/95 px-3 py-2 shadow-[0_18px_40px_-18px_var(--shadow-strong)] print:hidden"
             style={{ left: tipLeft }}
           >
             <p className="mb-1.5 text-[10.5px] text-sand">{titles[active]}</p>

@@ -292,7 +292,7 @@ function RequestCard({
       : `${amount ? `${amount} · ` : ""}${r.status === "cancelled" ? "cancelled" : `${r.status} by ${decider ?? "an admin"}`}`;
 
   return (
-    <li className="relative flex min-w-0 flex-col border border-cream/[0.08] bg-[linear-gradient(180deg,rgba(243,233,220,0.045),rgba(243,233,220,0.015))] px-4 py-3.5">
+    <li className="relative flex min-w-0 flex-col border border-cream/[0.08] surface px-4 py-3.5">
       <div className="flex items-start justify-between gap-3">
         <p className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-sand">
           <EntityIcon size={12} /> {ENTITY_LABEL[r.entity_type]} · {formatDateTime(r.created_at)}
@@ -306,7 +306,7 @@ function RequestCard({
         <Avatar name={requester} size={20} />
         <p className="min-w-0 truncate text-[12px] text-sand">{line}</p>
       </div>
-      {r.status === "rejected" && r.note && <p className="mt-1.5 line-clamp-2 text-[11.5px] text-rose-200/80">“{r.note}”</p>}
+      {r.status === "rejected" && r.note && <p className="mt-1.5 line-clamp-2 text-[11.5px] text-bad-200/80">“{r.note}”</p>}
 
       {actionable && (
         <div className="mt-3 flex items-center justify-end gap-2 border-t border-cream/[0.06] pt-3">

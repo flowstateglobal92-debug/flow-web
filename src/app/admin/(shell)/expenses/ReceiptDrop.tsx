@@ -63,7 +63,7 @@ export default function ReceiptDrop({
 
       {items.length > 0 && <ReceiptQueue items={items} onRemove={onRemove} disabled={disabled} className="mt-2" />}
 
-      {rejected && <p className="mt-1.5 text-[11.5px] text-rose-200">{rejected}</p>}
+      {rejected && <p className="mt-1.5 text-[11.5px] text-bad-200">{rejected}</p>}
     </div>
   );
 }
@@ -88,12 +88,12 @@ export function ReceiptQueue({
         return (
           <li
             key={item.key}
-            className={`relative border bg-ink/50 px-3 py-1.5 text-[12px] text-cream-2 ${failed ? "border-rose-400/30" : "border-cream/[0.08]"}`}
+            className={`relative border bg-ink/50 px-3 py-1.5 text-[12px] text-cream-2 ${failed ? "border-bad-400/30" : "border-cream/[0.08]"}`}
           >
             <div className="flex items-center gap-2">
               <Icon.paperclip size={12} />
               <span className="min-w-0 flex-1 truncate">{item.file.name}</span>
-              <span className={`shrink-0 font-mono text-[10.5px] tabular-nums ${failed ? "text-rose-200" : "text-sand"}`}>
+              <span className={`shrink-0 font-mono text-[10.5px] tabular-nums ${failed ? "text-bad-200" : "text-sand"}`}>
                 {uploading ? `${Math.round(item.progress * 100)}%` : failed ? "Failed" : formatBytes(item.file.size)}
               </span>
               <button
@@ -101,12 +101,12 @@ export function ReceiptQueue({
                 aria-label={`Remove ${item.file.name}`}
                 disabled={disabled || uploading}
                 onClick={() => onRemove(item.key)}
-                className="flex h-7 w-7 shrink-0 items-center justify-center text-sand transition-colors hover:text-rose-200 disabled:opacity-40 pointer-coarse:h-9 pointer-coarse:w-9"
+                className="flex h-7 w-7 shrink-0 items-center justify-center text-sand transition-colors hover:text-bad-200 disabled:opacity-40 pointer-coarse:h-9 pointer-coarse:w-9"
               >
                 <Icon.close size={13} />
               </button>
             </div>
-            {failed && item.error && <p className="mt-0.5 pl-5 text-[11px] leading-snug text-rose-200/90">{item.error}</p>}
+            {failed && item.error && <p className="mt-0.5 pl-5 text-[11px] leading-snug text-bad-200/90">{item.error}</p>}
             {uploading && (
               <span
                 aria-hidden

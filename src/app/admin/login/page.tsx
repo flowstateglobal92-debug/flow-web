@@ -45,9 +45,9 @@ export default async function LoginPage({
 
         <div className="glass glass--strong rounded-none p-5">
           {!SUPABASE_READY ? (
-            <div className="border border-amber-300/25 bg-amber-400/[0.07] px-3.5 py-3 text-[12.5px] text-amber-100">
+            <div className="border border-warn-300/25 bg-warn-400/[0.07] px-3.5 py-3 text-[12.5px] text-warn-100">
               <p className="font-medium">Supabase isn&apos;t configured yet.</p>
-              <p className="mt-1.5 text-amber-100/80">
+              <p className="mt-1.5 text-warn-100/80">
                 Copy <code className="font-mono text-[11.5px]">.env.example</code> to{" "}
                 <code className="font-mono text-[11.5px]">.env.local</code>, add your project URL and anon key, then
                 restart the dev server.

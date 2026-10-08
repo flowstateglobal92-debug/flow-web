@@ -30,12 +30,18 @@ export default function Aging({
   report,
   error,
   currency,
+  allCurrencies = false,
+  unconverted = [],
   canInvoices,
   canClients,
 }: {
   report: AgingReport | null;
   error: string | null;
   currency: string;
+  /** Every currency, in rupees at each invoice's rate. */
+  allCurrencies?: boolean;
+  /** Foreign invoices left out of "all" for want of a rate, as "2 USD". */
+  unconverted?: string[];
   canInvoices: boolean;
   canClients: boolean;
 }) {
@@ -77,11 +83,14 @@ export default function Aging({
       <div className="no-print mb-5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <select
-            value={currency}
+            value={allCurrencies ? "ALL" : currency}
             aria-label="Currency"
             onChange={(e) => router.push(`/admin/reports/aging${e.target.value === "LKR" ? "" : `?currency=${e.target.value}`}`)}
             className="min-h-9 border border-cream/12 bg-ink/60 px-2.5 py-1.5 text-[12px] text-cream-2 focus:border-terra/60 focus:outline-none sm:min-h-0"
           >
+            <option value="ALL" className="bg-ink text-cream">
+              All, in LKR
+            </option>
             {Object.keys(CURRENCY_SYMBOL).map((c) => (
               <option key={c} value={c} className="bg-ink text-cream">
                 {c}
@@ -90,6 +99,8 @@ export default function Aging({
           </select>
           <span className="text-[11.5px] text-sand">
             As of {report?.asOf ? formatDate(report.asOf) : "today"} · balance left on issued and part-paid invoices
+            {allCurrencies && " · foreign ones at their rate"}
+            {allCurrencies && unconverted.length > 0 && ` · without a rate, left out: ${unconverted.join(", ")}`}
           </span>
         </div>
         <ReportActions rows={rows} filename={`receivables-aging-${currency.toLowerCase()}-${report?.asOf || "today"}.csv`} />
@@ -295,7 +306,7 @@ function InvoiceList({ invoices, fmt, canInvoices }: { invoices: AgingInvoice[];
                 <span className="font-mono text-[11.5px] text-cream-2">{i.number ?? "Draft"}</span>
               )}
               <span className="text-sand">{i.due_date ? `due ${formatDate(i.due_date)}` : "no due date"}</span>
-              <span className={i.days_overdue > 0 ? "text-rose-200" : "text-sand"}>{dueText(i.days_overdue)}</span>
+              <span className={i.days_overdue > 0 ? "text-bad-200" : "text-sand"}>{dueText(i.days_overdue)}</span>
               <span className="ml-auto font-mono tabular-nums text-cream">{fmt(i.balance)}</span>
             </li>
           );

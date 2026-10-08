@@ -295,16 +295,16 @@ export default function Ledger({
       </div>
 
       {pendingCount > 0 && status !== "pending" && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border border-amber-300/20 bg-amber-400/[0.06] px-3.5 py-2.5 text-[12px] text-amber-100">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border border-warn-300/20 bg-warn-400/[0.06] px-3.5 py-2.5 text-[12px] text-warn-100">
           <span className="min-w-0">
             {pendingCount === 1 ? "1 entry is" : `${pendingCount} entries are`} waiting for approval — not counted in any total yet.
           </span>
           <span className="flex shrink-0 items-center gap-3">
-            <button type="button" onClick={() => goTo({ status: "pending" })} className="min-h-9 text-amber-200 underline-offset-4 hover:underline sm:min-h-0">
+            <button type="button" onClick={() => goTo({ status: "pending" })} className="min-h-9 text-warn-200 underline-offset-4 hover:underline sm:min-h-0">
               Show them
             </button>
             {approver && (
-              <Link href="/admin/approvals" className="inline-flex min-h-9 items-center text-amber-200 underline-offset-4 hover:underline sm:min-h-0">
+              <Link href="/admin/approvals" className="inline-flex min-h-9 items-center text-warn-200 underline-offset-4 hover:underline sm:min-h-0">
                 Review
               </Link>
             )}
@@ -381,7 +381,7 @@ export default function Ledger({
                         {shown.waiting > 0 && <span className="ml-2 normal-case tracking-normal text-sand/70">· {shown.waiting} awaiting approval not counted</span>}
                       </td>
                       <td
-                        className={`px-3 py-3 text-right font-mono text-[13px] font-medium tabular-nums ${shown.profit < 0 ? "text-rose-300" : "text-emerald-300"}`}
+                        className={`px-3 py-3 text-right font-mono text-[13px] font-medium tabular-nums ${shown.profit < 0 ? "text-bad-300" : "text-ok-300"}`}
                       >
                         {money(shown.profit)}
                       </td>
@@ -428,7 +428,7 @@ export default function Ledger({
                   <span className="text-[10.5px] uppercase tracking-[0.16em] text-sand">
                     {month === "all" ? "All time" : monthLabel(month)} · net
                   </span>
-                  <span className={`font-mono text-[13px] font-medium tabular-nums ${shown.profit < 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                  <span className={`font-mono text-[13px] font-medium tabular-nums ${shown.profit < 0 ? "text-bad-300" : "text-ok-300"}`}>
                     {money(shown.profit)}
                   </span>
                 </li>
@@ -452,13 +452,13 @@ export default function Ledger({
                     >
                       {monthLabel(m.month)}
                     </button>
-                    <span className={`font-mono text-[12px] tabular-nums ${m.profit < 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                    <span className={`font-mono text-[12px] tabular-nums ${m.profit < 0 ? "text-bad-300" : "text-ok-300"}`}>
                       {moneyShort(m.profit)}
                     </span>
                   </div>
                   <div className="mt-2 space-y-1">
                     <div className="h-1 w-full bg-cream/[0.06]">
-                      <div className="h-full bg-emerald-400/70" style={{ width: `${(m.income / peak) * 100}%` }} />
+                      <div className="h-full bg-ok-400/70" style={{ width: `${(m.income / peak) * 100}%` }} />
                     </div>
                     <div className="h-1 w-full bg-cream/[0.06]">
                       <div className="h-full bg-terra" style={{ width: `${(m.expense / peak) * 100}%` }} />
@@ -538,7 +538,7 @@ export default function Ledger({
                 onClick={() => setFormKind(k)}
                 className={`min-h-9 border px-3 py-2 text-[12.5px] font-medium capitalize transition-all duration-300 ${formKind === k
                     ? k === "income"
-                      ? "border-emerald-300/50 bg-emerald-400/10 text-emerald-200"
+                      ? "border-ok-300/50 bg-ok-400/10 text-ok-200"
                       : "border-terra/50 bg-terra/15 text-terra-bright"
                     : "border-cream/12 bg-cream/[0.03] text-sand hover:text-cream"
                   }`}
@@ -657,13 +657,14 @@ function Amount({ entry: e }: { entry: LedgerEntry }) {
   const isIncome = e.kind === "income";
   const signed = Number(e.signed_amount ?? (isIncome ? e.amount : -e.amount));
   const counted = counts(e);
-  const tone = !counted ? "text-sand" : isIncome ? "text-emerald-300" : "text-rose-300";
+  // A refund (0033) is income going back out: negative, and shown as money out.
+  const tone = !counted ? "text-sand" : signed >= 0 ? "text-ok-300" : "text-bad-300";
   return (
     <span
-      title={counted ? undefined : "Not counted until approved"}
+      title={counted ? (isIncome && signed < 0 ? "Refund — comes off Income" : undefined) : "Not counted until approved"}
       className={`shrink-0 whitespace-nowrap font-mono text-[12.5px] tabular-nums ${tone} ${stateOf(e) === "rejected" ? "line-through decoration-sand/60" : ""}`}
     >
-      {isIncome ? "+" : "−"}
+      {signed >= 0 ? "+" : "−"}
       {money(Math.abs(signed)).replace("−", "")}
     </span>
   );
@@ -696,7 +697,7 @@ function EntryMeta({ entry: e, canInvoices }: { entry: LedgerEntry; canInvoices:
       {state === "rejected" && (
         <span className="mt-1 flex min-w-0 items-start gap-1.5">
           <Badge tone="danger">Rejected</Badge>
-          <span className="min-w-0 text-[10.5px] leading-snug text-rose-200/80">{e.approval_note || "No reason given."}</span>
+          <span className="min-w-0 text-[10.5px] leading-snug text-bad-200/80">{e.approval_note || "No reason given."}</span>
         </span>
       )}
     </>
@@ -751,7 +752,7 @@ function RowActions({
           <button type="button" onClick={onEdit} aria-label="Edit entry" className={`${btn} hover:text-cream`}>
             <Icon.edit size={14} />
           </button>
-          <button type="button" disabled={pending} onClick={onDelete} aria-label="Delete entry" className={`${btn} hover:text-rose-300`}>
+          <button type="button" disabled={pending} onClick={onDelete} aria-label="Delete entry" className={`${btn} hover:text-bad-300`}>
             <Icon.trash size={14} />
           </button>
         </div>
@@ -792,7 +793,7 @@ function ReceiptList({
             onClick={() => {
               if (confirm(`Remove ${r.file_name ?? "this receipt"}? The file is deleted for good.`)) onRemove(r);
             }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center text-sand transition-colors hover:text-rose-200 pointer-coarse:h-9 pointer-coarse:w-9"
+            className="flex h-8 w-8 shrink-0 items-center justify-center text-sand transition-colors hover:text-bad-200 pointer-coarse:h-9 pointer-coarse:w-9"
           >
             <Icon.trash size={13} />
           </button>

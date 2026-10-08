@@ -53,3 +53,14 @@ public/logo.png
 .agents/
 .claude/
 skills-lock.json
+
+# desktop app (Electron) — dependencies and build output. Build folders end in
+# .nosync so iCloud Drive leaves them alone mid-build.
+/desktop/node_modules/
+/desktop/out.nosync/
+/desktop/dist.nosync/
+/desktop/release/
+/desktop/test-results/
+
+# Supabase CLI local state
+/supabase/.temp/

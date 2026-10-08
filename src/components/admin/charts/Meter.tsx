@@ -14,7 +14,7 @@ export default function Meter({
   label: string;
 }) {
   const p = Number.isFinite(percent) ? Math.max(0, percent) : 0;
-  const tone = p > 100 ? "bg-rose-400" : alertAt !== undefined && p >= alertAt ? "bg-amber-300" : "bg-terra";
+  const tone = p > 100 ? "bg-bad-400" : alertAt !== undefined && p >= alertAt ? "bg-warn-300" : "bg-terra";
   return (
     <div
       role="meter"

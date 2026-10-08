@@ -43,7 +43,7 @@ export default function TodoList({
             <header className="flex items-center justify-between gap-2 border-b border-cream/[0.06] px-3 py-2">
               <h3
                 className={`font-mono text-[10.5px] uppercase tracking-[0.16em] ${
-                  g === "overdue" ? "text-rose-300" : g === "today" ? "text-terra-bright" : "text-sand"
+                  g === "overdue" ? "text-bad-300" : g === "today" ? "text-terra-bright" : "text-sand"
                 }`}
               >
                 {GROUP_LABEL[g]}

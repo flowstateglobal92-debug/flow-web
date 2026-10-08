@@ -467,12 +467,12 @@ function MyTodosPanel({ todos, today }: { todos: { count: number; items: MyTodo[
                 href={hrefFor("todo", t.id) ?? "/admin/todos"}
                 className="flex items-start gap-3 border-b border-cream/[0.05] px-4 py-3 transition-colors hover:bg-cream/[0.04]"
               >
-                <span className={`mt-0.5 shrink-0 ${t.overdue ? "text-rose-300" : "text-terra-bright"}`}>
+                <span className={`mt-0.5 shrink-0 ${t.overdue ? "text-bad-300" : "text-terra-bright"}`}>
                   <Icon.checklist size={14} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[12.5px] text-cream">{t.title}</span>
-                  <span className={`block font-mono text-[10.5px] ${t.overdue ? "text-rose-300" : "text-sand"}`}>
+                  <span className={`block font-mono text-[10.5px] ${t.overdue ? "text-bad-300" : "text-sand"}`}>
                     {t.overdue ? `Overdue · ${t.when}` : t.when}
                     {(t.priority === "urgent" || t.priority === "high") && (
                       <span className="text-terra-bright"> · {t.priority}</span>
@@ -652,14 +652,14 @@ function BudgetPanel({ alerts }: { alerts: BudgetAlert[] }) {
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="min-w-0 truncate text-[12px] text-cream-2">{b.category}</span>
                   <span
-                    className={`shrink-0 font-mono text-[11px] tabular-nums ${over ? "text-rose-300" : "text-amber-200"}`}
+                    className={`shrink-0 font-mono text-[11px] tabular-nums ${over ? "text-bad-300" : "text-warn-200"}`}
                   >
                     {Math.round(b.pct)}%
                   </span>
                 </div>
                 <div className="mt-1.5 h-1 w-full bg-cream/[0.06]">
                   <div
-                    className={`h-full ${over ? "bg-rose-400/80" : "bg-amber-300/80"}`}
+                    className={`h-full ${over ? "bg-bad-400/80" : "bg-warn-300/80"}`}
                     style={{ width: `${Math.min(b.pct, 100)}%` }}
                   />
                 </div>
@@ -741,7 +741,7 @@ function PipelinePanel({ pipeline }: { pipeline: PipelineData }) {
                 </div>
                 <div className="mt-1.5 h-1 w-full bg-cream/[0.06]">
                   <div
-                    className={`h-full ${s.is_won ? "bg-emerald-400/70" : s.is_lost ? "bg-sand/40" : "bg-terra"}`}
+                    className={`h-full ${s.is_won ? "bg-ok-400/70" : s.is_lost ? "bg-sand/40" : "bg-terra"}`}
                     style={{ width: `${Math.max(share, s.value > 0 ? 4 : 0)}%` }}
                   />
                 </div>

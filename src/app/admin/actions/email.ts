@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { authorize } from "@/lib/admin/auth";
-import { isEmail, splitAddresses } from "@/lib/email/address";
+import { buildSend, checkDraft, checkForward } from "@/lib/email/core";
 import { MAILBOX_ADDRESS, MAILBOX_FROM } from "@/lib/email/config";
 import { resend, unwrap } from "@/lib/email/resend";
-import { MAX_ATTACHMENT_BYTES, type MailFlags, type MailRef } from "@/lib/email/types";
+import type { MailFlags, MailRef } from "@/lib/email/types";
 import { fail, ok, text, type ActionResult } from "./shared";
 
 /* ───────────────────────────── flags ────────────────────────────────── */
@@ -46,47 +46,32 @@ export async function markMailRead(ref: MailRef): Promise<ActionResult> {
 
 /* ───────────────────────────── sending ──────────────────────────────── */
 
-const escape = (value: string) =>
-  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-
-/** Plain text → a readable HTML part, so both halves of the message agree. */
-const bodyToHtml = (body: string) =>
-  `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:15px;line-height:1.65;color:#1b1a18;white-space:pre-wrap">${escape(
-    body,
-  )}</div>`;
-
 /**
  * Send a message from the mailbox address.
  *
  * Attachments arrive as real `File`s in the FormData (Next streams them through
  * the Server Action) and go out base64-encoded. Resend's ceiling is 40MB per
- * email *after* encoding, so the raw total is held to 20MB here.
- *
- * `inReplyTo` carries the original Message-ID, which is what makes the reply
- * land inside the same thread in the recipient's client rather than as a new
- * conversation.
+ * email *after* encoding, so the raw total is held to 20MB (checkDraft).
+ * The checks and the message itself come from @/lib/email/core, shared with
+ * the desktop app's mail function.
  */
 export async function sendMail(formData: FormData): Promise<ActionResult> {
   try {
     await authorize("email");
 
-    const to = splitAddresses(text(formData, "to"));
-    const cc = splitAddresses(text(formData, "cc"));
-    const bcc = splitAddresses(text(formData, "bcc"));
-    const subject = text(formData, "subject");
-    const body = String(formData.get("body") ?? "");
-
-    if (!to.length) return fail(new Error("Add at least one recipient."));
-    const bad = [...to, ...cc, ...bcc].find((a) => !isEmail(a));
-    if (bad) return fail(new Error(`"${bad}" isn't a valid email address.`));
-    if (!subject) return fail(new Error("Give the message a subject."));
-    if (!body.trim()) return fail(new Error("The message is empty."));
-
     const files = formData.getAll("attachments").filter((f): f is File => f instanceof File && f.size > 0);
-    const total = files.reduce((sum, f) => sum + f.size, 0);
-    if (total > MAX_ATTACHMENT_BYTES) {
-      return fail(new Error(`Attachments total ${(total / 1024 / 1024).toFixed(1)}MB — the limit is 20MB.`));
-    }
+    const draft = checkDraft(
+      {
+        to: text(formData, "to"),
+        cc: text(formData, "cc"),
+        bcc: text(formData, "bcc"),
+        subject: text(formData, "subject"),
+        body: String(formData.get("body") ?? ""),
+        inReplyTo: text(formData, "inReplyTo"),
+      },
+      files.reduce((sum, f) => sum + f.size, 0),
+    );
+    if ("error" in draft) return fail(new Error(draft.error));
 
     const attachments = await Promise.all(
       files.map(async (file) => ({
@@ -96,31 +81,15 @@ export async function sendMail(formData: FormData): Promise<ActionResult> {
       })),
     );
 
-    const inReplyTo = text(formData, "inReplyTo");
-    const headers: Record<string, string> = inReplyTo
-      ? { "In-Reply-To": inReplyTo, References: inReplyTo }
-      : {};
-
     const sent = unwrap(
-      await resend().emails.send({
-        from: MAILBOX_FROM,
-        to,
-        ...(cc.length ? { cc } : {}),
-        ...(bcc.length ? { bcc } : {}),
-        replyTo: MAILBOX_ADDRESS,
-        subject,
-        text: body,
-        html: bodyToHtml(body),
-        ...(attachments.length ? { attachments } : {}),
-        ...(Object.keys(headers).length ? { headers } : {}),
-      }),
+      await resend().emails.send(buildSend(draft, attachments, { from: MAILBOX_FROM, address: MAILBOX_ADDRESS })),
     );
 
     // Sent mail is never unread — seed the row now so Sent renders consistently.
     await setMailFlags([{ id: sent.id, direction: "outbound" }], { read: true });
 
     revalidatePath("/admin/email");
-    return ok(`Sent to ${to.join(", ")}.`);
+    return ok(`Sent to ${draft.to.join(", ")}.`);
   } catch (e) {
     return fail(e);
   }
@@ -137,10 +106,9 @@ export async function forwardMail(emailId: string, recipients: string): Promise<
   try {
     await authorize("email");
 
-    const to = splitAddresses(recipients);
-    if (!to.length) return fail(new Error("Add at least one recipient."));
-    const bad = to.find((a) => !isEmail(a));
-    if (bad) return fail(new Error(`"${bad}" isn't a valid email address.`));
+    const checked = checkForward(recipients);
+    if ("error" in checked) return fail(new Error(checked.error));
+    const { to } = checked;
 
     unwrap(await resend().emails.receiving.forward({ emailId, to, from: MAILBOX_FROM, passthrough: true }));
 

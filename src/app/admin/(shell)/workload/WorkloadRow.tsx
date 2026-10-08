@@ -134,7 +134,7 @@ export default function WorkloadRow({ person: p, today, href }: { person: Worklo
           value={
             <>
               {num(p.open_todos)}
-              {overdue > 0 && <span className="text-rose-300"> · {overdue} late</span>}
+              {overdue > 0 && <span className="text-bad-300"> · {overdue} late</span>}
             </>
           }
         />
@@ -145,7 +145,7 @@ export default function WorkloadRow({ person: p, today, href }: { person: Worklo
         <Metric
           label="Outstanding"
           value={moneyShort(num(p.outstanding_owned))}
-          tone={num(p.outstanding_owned) > 0 ? "text-amber-100" : ""}
+          tone={num(p.outstanding_owned) > 0 ? "text-warn-100" : ""}
         />
       </dl>
     </>

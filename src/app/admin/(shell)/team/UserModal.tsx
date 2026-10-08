@@ -244,7 +244,7 @@ export default function UserModal({
                   {gaps.length > 0 && (
                     <ul className="mt-3 space-y-1.5 border-t border-cream/[0.06] pt-3">
                       {gaps.map((g) => (
-                        <li key={`${g.key}-${g.needs}`} className="flex gap-2 text-[11.5px] leading-snug text-amber-200/90">
+                        <li key={`${g.key}-${g.needs}`} className="flex gap-2 text-[11.5px] leading-snug text-warn-200/90">
                           <Icon.bolt size={12} className="mt-0.5 shrink-0" />
                           <span className="min-w-0">{g.hint}</span>
                         </li>
@@ -252,7 +252,7 @@ export default function UserModal({
                     </ul>
                   )}
                   {perms.length === 0 && (
-                    <p className="mt-3 text-[11.5px] text-amber-200/90">
+                    <p className="mt-3 text-[11.5px] text-warn-200/90">
                       With nothing ticked they can sign in but only see My account and Approvals.
                     </p>
                   )}
@@ -291,8 +291,8 @@ export default function UserModal({
             )}
 
             {confirmText !== null && (
-              <div className="mt-3 border border-rose-400/25 bg-rose-500/[0.06] p-3">
-                <p className="text-[12px] leading-relaxed text-rose-100">
+              <div className="mt-3 border border-bad-400/25 bg-bad-500/[0.06] p-3">
+                <p className="text-[12px] leading-relaxed text-bad-100">
                   This deletes {name}&apos;s account for good. Records they made stay, without their name. Type{" "}
                   <span className="break-all font-mono">{member.email}</span> to confirm.
                 </p>

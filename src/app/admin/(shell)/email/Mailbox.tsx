@@ -212,7 +212,7 @@ export default function Mailbox({
         <Button onClick={() => router.refresh()} disabled={pending} aria-label="Refresh">
           <Icon.refresh size={13} />
         </Button>
-        <Button variant="primary" onClick={() => compose(emptyDraft)}>
+        <Button variant="primary" data-shortcut="new" onClick={() => compose(emptyDraft)}>
           <Icon.edit size={13} /> Compose
         </Button>
       </div>
@@ -233,7 +233,7 @@ export default function Mailbox({
               aria-label="Select all"
               checked={selected.length === items.length}
               onChange={() => setSelected(selected.length === items.length ? [] : items.map((m) => m.id))}
-              className="h-3.5 w-3.5 accent-[#c65d3b]"
+              className="h-3.5 w-3.5 accent-terra"
             />
             All
           </label>
@@ -319,7 +319,7 @@ export default function Mailbox({
     <div className={open ? "" : "hidden lg:block"}>
       {openError ? (
         <Panel title="That message didn't load">
-          <p className="text-[12.5px] text-rose-200">{openError}</p>
+          <p className="text-[12.5px] text-bad-200">{openError}</p>
         </Panel>
       ) : !open ? (
         <Panel bodyClass="p-4">
@@ -549,7 +549,7 @@ function Row({
         aria-label={`Select ${mail.subject}`}
         checked={checked}
         onChange={onCheck}
-        className="mt-1.5 h-3.5 w-3.5 shrink-0 accent-[#c65d3b]"
+        className="mt-1.5 h-3.5 w-3.5 shrink-0 accent-terra"
       />
       <button type="button" onClick={onOpen} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
         <span className="relative shrink-0">

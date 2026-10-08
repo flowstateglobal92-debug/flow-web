@@ -13,7 +13,7 @@ export default function LoginForm({ next, denied }: { next?: string; denied?: bo
   return (
     <form action={action} className="space-y-4">
       {denied && (
-        <div className="flex items-start gap-2.5 border border-amber-300/25 bg-amber-400/[0.07] px-3.5 py-2.5 text-[12px] text-amber-100">
+        <div className="flex items-start gap-2.5 border border-warn-300/25 bg-warn-400/[0.07] px-3.5 py-2.5 text-[12px] text-warn-100">
           <span className="mt-0.5 shrink-0">
             <Icon.lock size={14} />
           </span>
@@ -42,7 +42,7 @@ export default function LoginForm({ next, denied }: { next?: string; denied?: bo
       </Field>
 
       {state.error && (
-        <p role="alert" className="border border-rose-400/25 bg-rose-500/[0.08] px-3.5 py-2.5 text-[12px] text-rose-200">
+        <p role="alert" className="border border-bad-400/25 bg-bad-500/[0.08] px-3.5 py-2.5 text-[12px] text-bad-200">
           {state.error}
         </p>
       )}

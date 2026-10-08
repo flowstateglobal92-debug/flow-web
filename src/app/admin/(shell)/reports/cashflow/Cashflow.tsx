@@ -59,6 +59,7 @@ export default function Cashflow({
   const lastDay = forecast.weeks[forecast.weeks.length - 1]?.end ?? inputs.as_of;
   const dueSoon = inputs.receivables.filter((r) => !r.due_date || (r.due_date >= inputs.as_of && r.due_date <= lastDay));
   const recurringInRange = inputs.recurring.filter((r) => plusDays(r.run_on, lagDays) <= lastDay).length;
+  const billsTotal = forecast.weeks.reduce((a, w) => a + w.bills, 0);
   const monthly = basis === "budgets" ? inputs.budgets_monthly_total : inputs.expense_monthly_avg;
   const titles = forecast.weeks.map((w) => `Week ${w.week} · ${dayShort(w.start)} – ${dayShort(w.end)}`);
 
@@ -112,7 +113,7 @@ export default function Cashflow({
           )}
         </div>
         <Stat label={`Expected in · ${weeks} wks`} value={moneyShort(forecast.totals.inflow)} sub={`${dueSoon.length} invoices · ${recurringInRange} recurring runs`} tone="success" icon={<Icon.up size={15} />} />
-        <Stat label={`Expected out · ${weeks} wks`} value={moneyShort(forecast.totals.outflow)} sub={`${money(forecast.weeklyOutflow)} a week`} tone="terra" icon={<Icon.down size={15} />} />
+        <Stat label={`Expected out · ${weeks} wks`} value={moneyShort(forecast.totals.outflow)} sub={`${money(forecast.weeklyOutflow)} a week${billsTotal > 0 ? ` + ${moneyShort(billsTotal)} in supplier bills` : ""}`} tone="terra" icon={<Icon.down size={15} />} />
         <Stat
           label={`Balance in ${weeks} weeks`}
           value={money(forecast.closing)}
@@ -283,7 +284,7 @@ export default function Cashflow({
 }
 
 function Num({ value, strong = false }: { value: number; strong?: boolean }) {
-  const tone = value < 0 ? "text-rose-300" : strong ? "text-cream" : value === 0 ? "text-sand/50" : "text-cream-2";
+  const tone = value < 0 ? "text-bad-300" : strong ? "text-cream" : value === 0 ? "text-sand/50" : "text-cream-2";
   return (
     <td className={`whitespace-nowrap px-3 py-2.5 text-right font-mono text-[12px] tabular-nums ${tone} ${strong ? "font-medium" : ""}`}>
       {value === 0 && !strong ? "—" : money(value)}

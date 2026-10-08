@@ -105,7 +105,7 @@ export default function TimeOffPanel({ profile }: { profile: ShellProfile }) {
                       onClick={() => {
                         if (confirm("Remove this leave entry?")) run(() => deleteTimeOff(t.id), { onDone: reload });
                       }}
-                      className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-rose-200"
+                      className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-bad-200"
                     >
                       <Icon.trash size={13} />
                     </button>

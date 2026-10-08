@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { authorize, type Session } from "@/lib/admin/auth";
 import { addDays, formatDate, num, todayISO } from "@/lib/admin/format";
-import { computeTotals, round2, round3 } from "@/lib/admin/invoice-math";
+import { cleanTaxes, computeTotals, round2, round3 } from "@/lib/admin/invoice-math";
 import { canAccess, isApprover } from "@/lib/admin/modules";
 import {
   docMoney,
@@ -17,7 +17,7 @@ import {
 import { amount, fail, mustAffect, nextPosition, ok, optional, text, type ActionResult } from "./shared";
 
 /**
- * Invoices, quotes, payments and recurring schedules.
+ * Invoices, quotes, credit notes, payments, refunds and recurring schedules.
  *
  * The database does the bookkeeping: `save_invoice` writes the header and
  * items in one go and recomputes totals once, `issue_document` numbers the
@@ -45,6 +45,7 @@ function readDocument(input: DocumentInput): { doc: DocumentInput } | { error: s
       details: clean(i.details),
       quantity: round3(num(i.quantity)),
       unit_price: round2(num(i.unit_price)),
+      taxes: cleanTaxes(i.taxes),
     }))
     .filter((i) => i.description || i.details || i.unit_price > 0);
 
@@ -63,10 +64,18 @@ function readDocument(input: DocumentInput): { doc: DocumentInput } | { error: s
   const issueDate = day(input.issue_date);
   if (!issueDate) return { error: "Pick an issue date." };
 
+  const kind: InvoiceKind = input.kind === "quote" ? "quote" : input.kind === "credit_note" ? "credit_note" : "invoice";
+  if (kind === "credit_note" && !input.credited_invoice_id) return { error: "A credit note needs the invoice it credits." };
+  const currency = (input.currency || "LKR").toUpperCase();
+  const rate = input.exchange_rate == null || input.exchange_rate === ("" as unknown) ? null : num(input.exchange_rate);
+  if (rate != null && !(rate > 0)) return { error: "The exchange rate must be more than zero." };
+  const taxId = clean(input.bill_to_tax_id);
+  if (taxId && taxId.length > 40) return { error: "Keep the TIN to 40 characters." };
+
   return {
     doc: {
       id: input.id,
-      kind: input.kind === "quote" ? "quote" : "invoice",
+      kind,
       client_id: input.client_id || null,
       lead_id: input.lead_id || null,
       owner_id: input.owner_id || null,
@@ -77,9 +86,9 @@ function readDocument(input: DocumentInput): { doc: DocumentInput } | { error: s
       bill_to_address: clean(input.bill_to_address),
       subject: clean(input.subject),
       issue_date: issueDate,
-      due_date: input.kind === "quote" ? null : day(input.due_date),
-      valid_until: input.kind === "quote" ? day(input.valid_until) : null,
-      currency: (input.currency || "LKR").toUpperCase(),
+      due_date: kind === "invoice" ? day(input.due_date) : null,
+      valid_until: kind === "quote" ? day(input.valid_until) : null,
+      currency,
       discount_type: input.discount_type === "percent" ? "percent" : "amount",
       discount_value: discount,
       tax_label: (input.tax_label ?? "").trim() || "Tax",
@@ -87,6 +96,12 @@ function readDocument(input: DocumentInput): { doc: DocumentInput } | { error: s
       notes: clean(input.notes),
       terms: clean(input.terms),
       payment_details: clean(input.payment_details),
+      exchange_rate: currency === "LKR" ? null : rate,
+      prices_include_tax: !!input.prices_include_tax,
+      supply_date: day(input.supply_date),
+      bill_to_tax_id: taxId,
+      credited_invoice_id: kind === "credit_note" ? input.credited_invoice_id ?? null : null,
+      credit_reason: kind === "credit_note" ? input.credit_reason ?? "other" : null,
       items,
     },
   };
@@ -111,6 +126,7 @@ async function issue(supabase: Supabase, id: string) {
 function issuedMessage(kind: InvoiceKind, result: { status?: string; number?: string | null }) {
   if (result.status === "pending_approval") return "Sent for approval — an admin will issue it.";
   if (kind === "quote") return result.number ? `Quote ${result.number} marked sent.` : "Quote marked sent.";
+  if (kind === "credit_note") return `Credit note ${result.number} applied to its invoice.`;
   if (result.status === "paid") return `Issued as ${result.number} — nothing to pay, so it's marked paid.`;
   return `Issued as ${result.number}.`;
 }
@@ -134,6 +150,9 @@ const TEMPLATE_KEYS = [
   "notes",
   "terms",
   "payment_details",
+  "exchange_rate",
+  "prices_include_tax",
+  "bill_to_tax_id",
   "items",
 ] as const satisfies readonly (keyof ScheduleTemplate)[];
 
@@ -261,7 +280,13 @@ export async function saveDocument(
 
     savedId = await save(supabase, doc);
 
-    let message = doc.id ? "Saved." : doc.kind === "quote" ? "Quote saved as a draft." : "Draft saved.";
+    let message = doc.id
+      ? "Saved."
+      : doc.kind === "quote"
+        ? "Quote saved as a draft."
+        : doc.kind === "credit_note"
+          ? "Credit note saved as a draft."
+          : "Draft saved.";
     let nextRun: string | null = null;
 
     if (schedule) {
@@ -341,13 +366,14 @@ export async function duplicateDocument(id: string): Promise<ActionResult> {
       supabase.from("invoices").select("*").eq("id", id).maybeSingle<Record<string, unknown>>(),
       supabase
         .from("invoice_items")
-        .select("description, details, quantity, unit_price")
+        .select("description, details, quantity, unit_price, taxes")
         .eq("invoice_id", id)
         .order("position")
-        .returns<{ description: string; details: string | null; quantity: number; unit_price: number }[]>(),
+        .returns<{ description: string; details: string | null; quantity: number; unit_price: number; taxes: unknown }[]>(),
     ]);
     if (error) throw error;
     if (!row) return { ok: false, error: "That document isn't available." };
+    if (row.kind === "credit_note") return { ok: false, error: "Credit notes aren't copied — make a new one from the invoice." };
 
     const s = (k: string) => (row[k] == null ? null : String(row[k]));
     const issueDate = todayISO();
@@ -381,11 +407,15 @@ export async function duplicateDocument(id: string): Promise<ActionResult> {
       notes: s("notes"),
       terms: s("terms"),
       payment_details: s("payment_details"),
+      exchange_rate: row.exchange_rate == null ? null : num(row.exchange_rate),
+      prices_include_tax: !!row.prices_include_tax,
+      bill_to_tax_id: s("bill_to_tax_id"),
       items: (items ?? []).map((i) => ({
         description: i.description,
         details: i.details,
         quantity: num(i.quantity),
         unit_price: num(i.unit_price),
+        taxes: cleanTaxes(Array.isArray(i.taxes) ? i.taxes : []),
       })),
     });
 
@@ -396,7 +426,10 @@ export async function duplicateDocument(id: string): Promise<ActionResult> {
   }
 }
 
-/** Void an issued invoice. The database refuses while payments exist. */
+/**
+ * Void an issued invoice (the database refuses while payments or credit notes
+ * stand) or an issued credit note (its invoice owes the amount again).
+ */
 export async function voidInvoice(id: string): Promise<ActionResult> {
   try {
     const { supabase } = await authorize("invoices");
@@ -404,12 +437,13 @@ export async function voidInvoice(id: string): Promise<ActionResult> {
       .from("invoices")
       .update({ status: "void", voided_at: new Date().toISOString() })
       .eq("id", id)
-      .eq("kind", "invoice")
-      .select("id");
+      .in("kind", ["invoice", "credit_note"])
+      .select("id, kind")
+      .returns<{ id: string; kind: InvoiceKind }[]>();
     if (error) throw error;
     mustAffect(data);
     refresh();
-    return ok("Invoice voided.", id);
+    return ok(data?.[0]?.kind === "credit_note" ? "Credit note voided — its invoice owes that amount again." : "Invoice voided.", id);
   } catch (e) {
     return fail(e);
   }
@@ -435,12 +469,7 @@ export async function deleteDocument(id: string): Promise<ActionResult> {
 export async function recordPayment(invoiceId: string, formData: FormData): Promise<ActionResult> {
   try {
     const { supabase } = await authorize("invoices");
-    const { data: inv, error: readError } = await supabase
-      .from("invoices")
-      .select("id, kind, status, currency, total, amount_paid")
-      .eq("id", invoiceId)
-      .maybeSingle<{ id: string; kind: string; status: string; currency: string; total: number; amount_paid: number }>();
-    if (readError) throw readError;
+    const inv = await paymentTarget(supabase, invoiceId);
     if (!inv) return { ok: false, error: "That invoice isn't available." };
     if (inv.kind !== "invoice" || !["issued", "partially_paid"].includes(inv.status)) {
       return { ok: false, error: "Payments can only be recorded on an issued, unpaid invoice." };
@@ -448,17 +477,17 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
 
     const value = round2(amount(formData, "amount"));
     if (!(value > 0)) return { ok: false, error: "Enter the amount received." };
-    const left = round2(num(inv.total) - num(inv.amount_paid));
+    const left = round2(num(inv.total) - num(inv.amount_paid) - num(inv.credited_total));
     if (value > left) return { ok: false, error: `That's more than the ${docMoney(left, inv.currency)} left to pay.` };
 
-    const lkr = inv.currency.toUpperCase() === "LKR";
-    const base = lkr ? value : round2(amount(formData, "amount_base"));
-    if (!(base > 0)) return { ok: false, error: "Enter what arrived in rupees — Income is kept in LKR." };
+    const base = rupees(formData, inv, value);
+    if ("error" in base) return { ok: false, error: base.error };
 
     const { error } = await supabase.from("invoice_payments").insert({
       invoice_id: invoiceId,
+      kind: "payment",
       amount: value,
-      amount_base: base,
+      amount_base: base.value,
       paid_on: text(formData, "paid_on") || undefined,
       method: optional(formData, "method"),
       reference: optional(formData, "reference"),
@@ -474,15 +503,107 @@ export async function recordPayment(invoiceId: string, formData: FormData): Prom
   }
 }
 
+type PaymentTarget = {
+  id: string;
+  kind: string;
+  status: string;
+  currency: string;
+  total: number;
+  amount_paid: number;
+  credited_total?: number;
+  exchange_rate?: number | null;
+  number: string | null;
+};
+
+async function paymentTarget(supabase: Supabase, invoiceId: string) {
+  const { data, error } = await supabase
+    .from("invoices")
+    .select("*")
+    .eq("id", invoiceId)
+    .maybeSingle<PaymentTarget>();
+  if (error) throw error;
+  return data;
+}
+
+/** What arrived (or left) in rupees: as is for LKR; typed in, or the document's rate × amount, otherwise. */
+function rupees(formData: FormData, inv: PaymentTarget, value: number): { value: number | null } | { error: string } {
+  if (inv.currency.toUpperCase() === "LKR") return { value };
+  const typed = round2(amount(formData, "amount_base"));
+  if (typed > 0) return { value: typed };
+  if (inv.exchange_rate && num(inv.exchange_rate) > 0) return { value: round2(value * num(inv.exchange_rate)) };
+  return { error: "Enter the amount in rupees — Income is kept in LKR." };
+}
+
+/**
+ * Money going back to the client: up to what they've paid beyond what they
+ * now owe (after credit notes). Posts to Income as a negative line.
+ */
+export async function recordRefund(invoiceId: string, formData: FormData): Promise<ActionResult> {
+  try {
+    const { supabase } = await authorize("invoices");
+    const inv = await paymentTarget(supabase, invoiceId);
+    if (!inv || inv.kind !== "invoice") return { ok: false, error: "That invoice isn't available." };
+    const due = round2(num(inv.amount_paid) + num(inv.credited_total) - num(inv.total));
+    if (!(due > 0)) return { ok: false, error: "Nothing to refund — the client hasn't paid more than they owe." };
+
+    const value = round2(amount(formData, "amount"));
+    if (!(value > 0)) return { ok: false, error: "Enter the amount refunded." };
+    if (value > due) return { ok: false, error: `That's more than the ${docMoney(due, inv.currency)} owed back.` };
+
+    const base = rupees(formData, inv, value);
+    if ("error" in base) return { ok: false, error: base.error };
+
+    const { error } = await supabase.from("invoice_payments").insert({
+      invoice_id: invoiceId,
+      kind: "refund",
+      amount: value,
+      amount_base: base.value,
+      paid_on: text(formData, "paid_on") || undefined,
+      method: optional(formData, "method"),
+      reference: optional(formData, "reference"),
+      note: optional(formData, "note"),
+    });
+    if (error) throw error;
+    refresh();
+    return ok("Refund recorded — it comes off Income.", invoiceId);
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** An admin closes what's left as bad debt (a write-off credit note, issued at once). */
+export async function writeOffInvoice(invoiceId: string, note: string): Promise<ActionResult> {
+  try {
+    const { supabase, profile } = await authorize("invoices");
+    if (!isApprover(profile)) return { ok: false, error: "Only an admin can write off an invoice." };
+    const { data, error } = await supabase.rpc("write_off_invoice", { p_invoice: invoiceId, p_note: note.trim() || null });
+    if (error) throw error;
+    refresh();
+    revalidatePath("/admin/reports", "layout");
+    return ok("Written off — the balance is closed by a credit note.", String(data ?? invoiceId));
+  } catch (e) {
+    return fail(e);
+  }
+}
+
 /** Remove one payment; its income entry leaves Expenses with it. */
 export async function deletePayment(paymentId: string): Promise<ActionResult> {
   try {
     const { supabase } = await authorize("invoices");
-    const { data, error } = await supabase.from("invoice_payments").delete().eq("id", paymentId).select("id");
+    const { data, error } = await supabase
+      .from("invoice_payments")
+      .delete()
+      .eq("id", paymentId)
+      .select("id, kind")
+      .returns<{ id: string; kind?: string }[]>();
     if (error) throw error;
     mustAffect(data);
     refresh();
-    return ok("Payment removed — its income entry is gone from Expenses.");
+    return ok(
+      data?.[0]?.kind === "refund"
+        ? "Refund removed — its line is gone from Income."
+        : "Payment removed — its income entry is gone from Expenses.",
+    );
   } catch (e) {
     return fail(e);
   }
@@ -591,12 +712,10 @@ export async function saveInvoiceSettings(formData: FormData): Promise<ActionRes
 
     const business_name = text(formData, "business_name");
     if (!business_name) return { ok: false, error: "The business name prints on every invoice — add it." };
-    const rate = round2(amount(formData, "default_tax_rate"));
-    if (rate < 0 || rate > 100) return { ok: false, error: "Tax rate must be between 0 and 100%." };
     const dueDays = Math.floor(amount(formData, "default_due_days"));
     if (dueDays < 0 || dueDays > 365) return { ok: false, error: "Payment terms must be 0–365 days." };
-    const prefix = (k: string, fallback: string) =>
-      (text(formData, k) || fallback).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8) || fallback;
+    const fyStart = Math.floor(amount(formData, "fiscal_year_start_month")) || 4;
+    if (fyStart < 1 || fyStart > 12) return { ok: false, error: "Pick the month the tax year starts." };
 
     const { data, error } = await supabase
       .from("invoice_settings")
@@ -608,14 +727,13 @@ export async function saveInvoiceSettings(formData: FormData): Promise<ActionRes
         business_website: optional(formData, "business_website"),
         tax_id: optional(formData, "tax_id"),
         default_currency: (text(formData, "default_currency") || "LKR").toUpperCase(),
-        tax_label: text(formData, "tax_label") || "VAT",
-        default_tax_rate: rate,
         default_due_days: dueDays,
         default_notes: optional(formData, "default_notes"),
         default_terms: optional(formData, "default_terms"),
         payment_details: optional(formData, "payment_details"),
-        invoice_prefix: prefix("invoice_prefix", "INV"),
-        quote_prefix: prefix("quote_prefix", "QT"),
+        tax_registered: formData.get("tax_registered") === "on",
+        prices_include_tax: formData.get("prices_include_tax") === "on",
+        fiscal_year_start_month: fyStart,
       })
       .eq("workspace", profile.workspace)
       .select("workspace");
@@ -816,6 +934,20 @@ export async function runRecurringNow(): Promise<ActionResult> {
     const n = Number(data ?? 0);
     refresh();
     return ok(n > 0 ? `Generated ${n} invoice${n === 1 ? "" : "s"}.` : "Nothing due — every schedule is up to date.");
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Stop (or restart) the automatic reminders for one invoice (0038). */
+export async function setInvoiceReminders(id: string, paused: boolean): Promise<ActionResult> {
+  try {
+    const { supabase } = await authorize("invoices");
+    const { data, error } = await supabase.from("invoices").update({ reminders_paused: paused }).eq("id", id).select("id");
+    if (error) throw error;
+    mustAffect(data);
+    refresh();
+    return ok(paused ? "No more reminders for this invoice." : "Reminders back on for this invoice.", id);
   } catch (e) {
     return fail(e);
   }

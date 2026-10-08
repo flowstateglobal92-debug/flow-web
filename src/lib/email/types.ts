@@ -81,3 +81,19 @@ export const formatBytes = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+/**
+ * A message the app sends on its own (a document, statement or reminder) —
+ * as opposed to one typed in the mailbox's Compose. `about` names the record
+ * so the desktop's mail function can check the sender may open it.
+ */
+export type OutgoingMessage = {
+  to: string;
+  cc?: string;
+  subject: string;
+  body: string;
+  attachments?: { filename: string; content: Uint8Array; contentType: string }[];
+  about: { module: "invoices" | "clients"; invoiceId?: string | null; clientId?: string | null };
+};
+
+export type SentMessage = { id: string; to: string[]; cc: string[] };

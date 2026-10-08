@@ -72,7 +72,7 @@ export default function TeamTable({
         <p className="font-mono text-[11px] text-sand tabular-nums">
           {members.length} {members.length === 1 ? "person" : "people"} · {active} with access
         </p>
-        <Button variant="primary" className="min-h-9" onClick={() => setModal({ member: null })}>
+        <Button variant="primary" className="min-h-9" data-shortcut="new" onClick={() => setModal({ member: null })}>
           <Icon.plus size={13} /> Add teammate
         </Button>
       </div>

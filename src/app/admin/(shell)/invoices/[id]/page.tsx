@@ -2,12 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getSession, requireModule } from "@/lib/admin/auth";
 import { formatDate, todayISO } from "@/lib/admin/format";
-import { canAccess } from "@/lib/admin/modules";
+import { canAccess, isApprover } from "@/lib/admin/modules";
 import { displayName, loadTeam } from "@/lib/admin/team";
 import type { ActivityEntry } from "@/lib/admin/types";
 import { Notice } from "@/components/admin/ui";
-import { businessFrom, docLabel } from "@/lib/admin/invoice-types";
-import InvoiceDetail, { type DetailTab, type RelatedLinks } from "./InvoiceDetail";
+import { brandingFrom, businessFrom, docLabel, type DocumentEmail, type Invoice } from "@/lib/admin/invoice-types";
+import InvoiceDetail, { type CreditNoteRow, type DetailTab, type RelatedLinks } from "./InvoiceDetail";
 import { loadDocument, loadSettings } from "../data";
 
 const TABS: DetailTab[] = ["preview", "payments", "comments", "activity"];
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     .from("invoices")
     .select("kind, number")
     .eq("id", id)
-    .maybeSingle<{ kind: "invoice" | "quote"; number: string | null }>();
+    .maybeSingle<Pick<Invoice, "kind" | "number">>();
   return { title: data ? docLabel(data) : "Invoice" };
 }
 
@@ -40,7 +40,7 @@ export default async function InvoicePage({
   const today = todayISO();
 
   const name = <T,>(q: PromiseLike<{ data: T | null }>) => Promise.resolve(q).then((r) => r.data);
-  const [settings, team, { data: activity }, sourceQuote, converted, schedule, client, lead] = await Promise.all([
+  const [settings, team, { data: activity }, sourceQuote, converted, schedule, client, lead, creditNotes, credited, emails] = await Promise.all([
     loadSettings(supabase, profile.workspace),
     loadTeam(supabase),
     supabase
@@ -66,6 +66,29 @@ export default async function InvoicePage({
     invoice.lead_id && canAccess(profile, "crm")
       ? name(supabase.from("leads").select("id, name").eq("id", invoice.lead_id).maybeSingle<{ id: string; name: string }>())
       : null,
+    invoice.kind === "invoice"
+      ? name(
+          supabase
+            .from("invoices")
+            .select("id, number, status, total, credit_reason, issue_date")
+            .eq("credited_invoice_id", id)
+            .order("issue_date", { ascending: true })
+            .returns<CreditNoteRow[]>(),
+        )
+      : null,
+    invoice.credited_invoice_id
+      ? name(supabase.from("invoices").select("id, number").eq("id", invoice.credited_invoice_id).maybeSingle<{ id: string; number: string | null }>())
+      : null,
+    // Empty before 0036 — the select just fails quietly.
+    name(
+      supabase
+        .from("document_emails")
+        .select("id, kind, invoice_id, client_id, to_addresses, cc_addresses, subject, step, sent_by, sent_at")
+        .eq("invoice_id", id)
+        .order("sent_at", { ascending: false })
+        .limit(50)
+        .returns<DocumentEmail[]>(),
+    ),
   ]);
 
   const related: RelatedLinks = {
@@ -74,6 +97,7 @@ export default async function InvoicePage({
     schedule: schedule ? { id: schedule.id, label: schedule.name } : null,
     client: client && canAccess(profile, "clients") ? { id: client.id, label: client.name } : null,
     lead: lead ? { id: lead.id, label: lead.name } : null,
+    credited: credited ? { id: credited.id, label: credited.number ?? "Draft invoice" } : null,
   };
 
   const quote = invoice.kind === "quote";
@@ -81,7 +105,9 @@ export default async function InvoicePage({
     sp.just === "issued" && invoice.status !== "pending_approval"
       ? quote
         ? { title: `Quote ${invoice.number ?? ""} marked sent.`, body: "Record the client's answer here, then convert it to an invoice." }
-        : { title: `Issued as ${invoice.number}.`, body: "Print it or save the PDF. Record payments here as they arrive." }
+        : invoice.kind === "credit_note"
+          ? { title: `Credit note ${invoice.number} applied.`, body: "Its invoice's balance went down by the credit. Record a refund on the invoice if the client had already paid." }
+          : { title: `Issued as ${invoice.number}.`, body: "Print it or save the PDF. Record payments here as they arrive." }
       : sp.just === "saved"
         ? { title: "Changes saved.", body: "The paper below is the updated version." }
         : null;
@@ -115,6 +141,12 @@ export default async function InvoicePage({
         items={items}
         payments={payments}
         business={businessFrom(settings)}
+        branding={brandingFrom(settings)}
+        creditNotes={creditNotes ?? []}
+        emails={emails ?? []}
+        creditedNumber={credited?.number ?? null}
+        isAdmin={isApprover(profile)}
+        onlinePayments={!!settings.online_payments}
         people={team.filter((m) => canAccess({ ...m, workspace: profile.workspace }, "invoices"))}
         names={Object.fromEntries(team.map((m) => [m.id, displayName(m)]))}
         activity={activity ?? []}

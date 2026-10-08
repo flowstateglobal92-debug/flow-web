@@ -29,7 +29,8 @@ export default function AlertStack({
   // message lands or screen readers skip it. Empty, it's invisible and inert.
   return (
     <div
-      className="pointer-events-none fixed inset-x-3 top-[60px] z-[115] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-4 sm:w-[340px]"
+      // --top-right-offset: the desktop app's update notice, when it shows above the toasts.
+      className="pointer-events-none fixed inset-x-3 top-[60px] z-[115] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-[calc(1rem+var(--top-right-offset,0px))] sm:w-[340px]"
       aria-live="polite"
       aria-relevant="additions"
       data-shell-chrome

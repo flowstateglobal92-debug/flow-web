@@ -3,6 +3,9 @@ import { requireUser } from "@/lib/admin/auth";
 import { PageHead } from "@/components/admin/ui";
 import TimeOffPanel from "@/components/admin/timeoff/TimeOffPanel";
 import NotificationPrefs from "@/components/admin/notifications/NotificationPrefs";
+import AppearancePrefs from "@/components/admin/theme/AppearancePrefs";
+import AppUpdates from "@/components/admin/AppUpdates";
+import DesktopPrefs from "@/components/admin/DesktopPrefs";
 import { ROLE_LABEL } from "@/lib/admin/types";
 import AccountForms from "./AccountForms";
 
@@ -17,7 +20,7 @@ export default async function AccountPage() {
       <PageHead
         eyebrow={demo ? "Demo · My account" : `My account · ${ROLE_LABEL[profile.role]}`}
         title={profile.full_name || profile.email}
-        hint="Your profile, password, leave and how alerts reach you."
+        hint="Your profile, password, leave, how alerts reach you and how Flow State looks."
       />
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
@@ -27,6 +30,9 @@ export default async function AccountPage() {
             email={profile.email}
             demo={demo}
           />
+          <AppearancePrefs />
+          {/* The desktop app's own settings (Quick capture, App lock); nothing on the website. */}
+          <DesktopPrefs />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <div id="time-off" className="scroll-mt-24">
@@ -44,6 +50,7 @@ export default async function AccountPage() {
             />
           </div>
           <NotificationPrefs />
+          <AppUpdates />
         </div>
       </div>
     </>

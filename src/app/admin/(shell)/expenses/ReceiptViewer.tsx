@@ -177,7 +177,7 @@ function Preview({
         {!link ? (
           <p className="text-[12px] text-sand">Fetching a secure link…</p>
         ) : !link.ok || !link.url ? (
-          <p className="px-4 text-center text-[12px] text-rose-200">{link.error ?? "Couldn't open this receipt."}</p>
+          <p className="px-4 text-center text-[12px] text-bad-200">{link.error ?? "Couldn't open this receipt."}</p>
         ) : isPdf ? (
           // A frame, not <object>: the site CSP sends object-src 'none'. No sandbox —
           // Chrome won't run its PDF viewer in a sandboxed frame.

@@ -70,7 +70,7 @@ export default async function EmailPage({
         hint={`Everything sent from and received at ${MAILBOX_ADDRESS}. Replies thread properly, attachments go both ways.`}
       />
       {page.warnings.length > 0 && (
-        <div className="mb-4 border border-amber-300/25 bg-amber-400/[0.07] px-3.5 py-2.5 text-[12px] text-amber-100">
+        <div className="mb-4 border border-warn-300/25 bg-warn-400/[0.07] px-3.5 py-2.5 text-[12px] text-warn-100">
           {page.warnings.map((w) => (
             <p key={w}>{w}</p>
           ))}

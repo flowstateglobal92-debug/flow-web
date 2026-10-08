@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "resend": "npm:resend@6.20.0",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.112.3",
+    "@std/encoding/base64": "jsr:@std/encoding@1/base64"
+  }
+}

@@ -163,7 +163,7 @@ export default function QuotesList({
                           </Link>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-[11.5px] text-sand">{formatDate(qt.issue_date)}</td>
-                        <td className={`whitespace-nowrap px-3 py-3 text-[11.5px] ${expired ? "text-rose-300" : "text-sand"}`}>
+                        <td className={`whitespace-nowrap px-3 py-3 text-[11.5px] ${expired ? "text-bad-300" : "text-sand"}`}>
                           {qt.valid_until ? formatDate(qt.valid_until) : "—"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-[12px] text-cream tabular-nums">
@@ -193,7 +193,7 @@ export default function QuotesList({
                           {qt.number ?? "Draft"} · {formatDateShort(qt.issue_date)}
                         </span>
                         <span className="mt-0.5 block truncate font-display text-[14px] text-cream">{billedTo(qt)}</span>
-                        <span className={`mt-0.5 block truncate text-[11.5px] ${expired ? "text-rose-300" : "text-sand"}`}>
+                        <span className={`mt-0.5 block truncate text-[11.5px] ${expired ? "text-bad-300" : "text-sand"}`}>
                           {docMoney(num(qt.total), qt.currency)}
                           {qt.valid_until ? ` · valid until ${formatDateShort(qt.valid_until)}` : ""}
                         </span>

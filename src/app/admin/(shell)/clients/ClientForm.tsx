@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import Modal from "@/components/admin/Modal";
 import { Icon } from "@/components/admin/icons";
 import { useAction } from "@/components/admin/useAction";
-import { Button, Field, Input, Select, Textarea } from "@/components/admin/ui";
+import { Button, Checkbox, Field, Input, Select, Textarea } from "@/components/admin/ui";
 import { displayName } from "@/lib/admin/format";
 import type { TeamMember } from "@/lib/admin/types";
 import { addClient, deleteClient, setClientStatus, updateClient } from "@/app/admin/actions/clients";
@@ -89,6 +89,23 @@ export default function ClientForm({
             <Field label="Website">
               <Input name="website" defaultValue={client?.website ?? ""} placeholder="pereradental.lk" />
             </Field>
+            {client?.statement_monthly !== undefined && (
+              <div className="space-y-2.5 sm:col-span-2">
+                <input type="hidden" name="billing_prefs" value="1" />
+                <Checkbox
+                  name="statement_monthly"
+                  defaultChecked={!!client.statement_monthly}
+                  label="Email a statement every month"
+                  hint="On the 1st, for the month before — while they owe something. Goes to the email above."
+                />
+                <Checkbox
+                  name="reminders_paused"
+                  defaultChecked={!!client.reminders_paused}
+                  label="No payment reminders"
+                  hint="Overdue invoices to this client don't get the automatic reminder emails."
+                />
+              </div>
+            )}
             <Field label="Status">
               <Select name="status" defaultValue={client?.status ?? "active"}>
                 {CLIENT_STATUSES.map((s) => (

@@ -58,19 +58,28 @@ export function dayShort(day: string) {
 
 /* ─────────────────────────────── periods ─────────────────────────────── */
 
-export type Period = "month" | "quarter" | "year" | "custom";
+export type Period = "month" | "quarter" | "year" | "tax_year" | "custom";
 
 export const PERIODS: { value: Period; label: string }[] = [
   { value: "month", label: "Month" },
   { value: "quarter", label: "Quarter" },
   { value: "year", label: "Year" },
+  { value: "tax_year", label: "Tax year" },
   { value: "custom", label: "Custom" },
 ];
 
-/** The calendar period containing `at`, inclusive on both ends. */
-export function periodRange(period: Exclude<Period, "custom">, at: string) {
+/**
+ * The period containing `at`, inclusive on both ends. A tax year starts in
+ * `fyStart` (invoice_settings.fiscal_year_start_month; April in Sri Lanka).
+ */
+export function periodRange(period: Exclude<Period, "custom">, at: string, fyStart = 4) {
   const y = Number(at.slice(0, 4));
   const m = Number(at.slice(5, 7)) - 1;
+  if (period === "tax_year") {
+    const start = fyStart - 1;
+    const from = iso(Date.UTC(m >= start ? y : y - 1, start, 1));
+    return { from, to: plusDays(monthStart(from, 12), -1) };
+  }
   const startMonth = period === "month" ? m : period === "quarter" ? m - (m % 3) : 0;
   const length = period === "month" ? 1 : period === "quarter" ? 3 : 12;
   const from = iso(Date.UTC(y, startMonth, 1));
@@ -79,18 +88,19 @@ export function periodRange(period: Exclude<Period, "custom">, at: string) {
 }
 
 /** Step a period backwards or forwards by `n` whole periods. */
-export function shiftPeriod(period: Exclude<Period, "custom">, at: string, n: number) {
+export function shiftPeriod(period: Exclude<Period, "custom">, at: string, n: number, fyStart = 4) {
   const months = period === "month" ? 1 : period === "quarter" ? 3 : 12;
-  return periodRange(period, monthStart(at, months * n)).from;
+  return periodRange(period, monthStart(at, months * n), fyStart).from;
 }
 
-/** "October 2026", "Q4 2026", "2026", or "01 Oct 2026 – 15 Nov 2026". */
+/** "October 2026", "Q4 2026", "2026", "2026/27", or "01 Oct 2026 – 15 Nov 2026". */
 export function periodLabel(period: Period, from: string, to: string) {
   const y = from.slice(0, 4);
   const m = Number(from.slice(5, 7)) - 1;
   if (period === "month") return `${MONTHS_LONG[m]} ${y}`;
   if (period === "quarter") return `Q${Math.floor(m / 3) + 1} ${y}`;
   if (period === "year") return y;
+  if (period === "tax_year") return m === 0 ? y : `${y}/${String((Number(y) + 1) % 100).padStart(2, "0")}`;
   return `${dayShort(from)} ${from.slice(0, 4)} – ${dayShort(to)} ${to.slice(0, 4)}`;
 }
 
@@ -152,6 +162,10 @@ export type CashflowInputs = {
   opening_balance_on: string | null;
   receivables: { id: string; number: string | null; client: string | null; due_date: string | null; balance: number }[];
   recurring: { schedule_id: string; name: string; run_on: string; amount: number }[];
+  /** Open supplier bills (0040), by due date. */
+  payables?: { id: string; reference: string | null; supplier: string | null; due_date: string | null; balance: number }[];
+  /** Bills recurring expenses will raise (0040), on their due day. */
+  recurring_bills?: { schedule_id: string; name: string; due_on: string; amount: number }[];
   expense_monthly_avg: number;
   budgets_monthly_total: number;
 };
@@ -174,6 +188,8 @@ export type ForecastWeek = {
   receivables: number;
   recurring: number;
   inflow: number;
+  /** Supplier bills due that week (open ones and recurring) — part of `outflow`. */
+  bills: number;
   outflow: number;
   net: number;
   balance: number;
@@ -189,6 +205,8 @@ export type Forecast = {
   atRisk: { total: number; count: number };
   /** Due or arriving after the horizon — left out. */
   beyond: { total: number; count: number };
+  /** Bills already past due on `as_of` — counted in week 1. */
+  billsOverdue: { total: number; count: number };
   totals: { inflow: number; outflow: number; net: number };
   closing: number;
   lowest: { week: number; balance: number };
@@ -206,9 +224,11 @@ const rupees = (c: number) => c / 100;
  *
  * Inflows: each open invoice's balance lands in the week of its due date (no
  * due date = due now); recurring runs land `recurringLagDays` after they run.
- * Outflows: a flat weekly burn — the trailing 3-month expense average or the
- * active budgets, both monthly figures × 12 ⁄ 52. The running balance starts
- * from the stored opening balance.
+ * Outflows: a flat weekly burn — the trailing 3-month expense average (bill
+ * payments left out) or the active budgets, both monthly figures × 12 ⁄ 52 —
+ * plus supplier bills in the week they fall due (overdue ones in week 1,
+ * recurring ones on the day they'll be due). The running balance starts from
+ * the stored opening balance.
  */
 export function forecastCashflow(inputs: CashflowInputs, options: ForecastOptions): Forecast {
   const weeks = Math.max(1, Math.min(52, Math.floor(options.weeks ?? 12)));
@@ -220,6 +240,9 @@ export function forecastCashflow(inputs: CashflowInputs, options: ForecastOption
 
   const recv = new Array<number>(weeks).fill(0);
   const rec = new Array<number>(weeks).fill(0);
+  const bills = new Array<number>(weeks).fill(0);
+  let billsOverdue = 0;
+  let billsOverdueCount = 0;
   let atRisk = 0;
   let atRiskCount = 0;
   let beyond = 0;
@@ -257,6 +280,26 @@ export function forecastCashflow(inputs: CashflowInputs, options: ForecastOption
     }
   }
 
+  for (const b of inputs.payables ?? []) {
+    const amount = cents(b.balance);
+    if (amount <= 0) continue;
+    const due = isDay(b.due_date) ? b.due_date : asOf;
+    if (due < asOf) {
+      billsOverdue += amount;
+      billsOverdueCount += 1;
+      bills[0] += amount;
+      continue;
+    }
+    const i = slot(due);
+    if (i < weeks) bills[i] += amount;
+  }
+  for (const b of inputs.recurring_bills ?? []) {
+    const amount = cents(b.amount);
+    if (amount <= 0 || !isDay(b.due_on)) continue;
+    const i = Math.max(0, slot(b.due_on));
+    if (i < weeks) bills[i] += amount;
+  }
+
   const opening = cents(inputs.opening_balance);
   let balance = opening;
   let lowest = { week: 0, balance: opening };
@@ -266,10 +309,11 @@ export function forecastCashflow(inputs: CashflowInputs, options: ForecastOption
   const out: ForecastWeek[] = [];
   for (let i = 0; i < weeks; i++) {
     const inflow = recv[i] + rec[i];
-    const net = inflow - weekly;
+    const outflow = weekly + bills[i];
+    const net = inflow - outflow;
     balance += net;
     inflowTotal += inflow;
-    outflowTotal += weekly;
+    outflowTotal += outflow;
     if (balance < lowest.balance) lowest = { week: i + 1, balance };
     out.push({
       week: i + 1,
@@ -278,7 +322,8 @@ export function forecastCashflow(inputs: CashflowInputs, options: ForecastOption
       receivables: rupees(recv[i]),
       recurring: rupees(rec[i]),
       inflow: rupees(inflow),
-      outflow: rupees(weekly),
+      bills: rupees(bills[i]),
+      outflow: rupees(outflow),
       net: rupees(net),
       balance: rupees(balance),
     });
@@ -292,6 +337,7 @@ export function forecastCashflow(inputs: CashflowInputs, options: ForecastOption
     weeks: out,
     atRisk: { total: rupees(atRisk), count: atRiskCount },
     beyond: { total: rupees(beyond), count: beyondCount },
+    billsOverdue: { total: rupees(billsOverdue), count: billsOverdueCount },
     totals: { inflow: rupees(inflowTotal), outflow: rupees(outflowTotal), net: rupees(inflowTotal - outflowTotal) },
     closing: rupees(balance),
     lowest: { week: lowest.week, balance: rupees(lowest.balance) },

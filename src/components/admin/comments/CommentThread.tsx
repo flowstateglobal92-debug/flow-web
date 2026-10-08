@@ -152,7 +152,7 @@ export default function CommentThread({
                           disabled={pending}
                           aria-label="Delete comment"
                           title="Delete"
-                          className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-rose-200 sm:h-6 sm:w-6"
+                          className="flex h-9 w-9 items-center justify-center text-sand transition-colors hover:text-bad-200 sm:h-6 sm:w-6"
                         >
                           <Icon.trash size={13} />
                         </button>

@@ -46,8 +46,8 @@ type OpenTodo = { id: string; title: string; due_at: string | null; all_day: boo
 const STAGE_DOT: Record<StageTone, string> = {
   terra: "bg-terra",
   cream: "bg-cream/60",
-  success: "bg-emerald-300",
-  warn: "bg-amber-300",
+  success: "bg-ok-300",
+  warn: "bg-warn-300",
   muted: "bg-sand/60",
 };
 
@@ -79,8 +79,16 @@ export default async function ClientPage({ params }: Params) {
     CLIENT_COLUMNS,
     "account_manager_id",
   );
-  const client = found.rows[0];
-  if (!client) notFound();
+  const row = found.rows[0];
+  if (!row) notFound();
+  // Billing preferences (0037/0038), read on their own so a pending migration
+  // only hides them.
+  const { data: billing } = await supabase
+    .from("clients")
+    .select("statement_monthly, reminders_paused")
+    .eq("id", id)
+    .maybeSingle<Pick<Client, "statement_monthly" | "reminders_paused">>();
+  const client: Client = billing ? { ...row, ...billing } : row;
 
   // All-day events sit at local midnight, so "upcoming" starts at the top of today.
   const startOfToday = `${todayISO()}T00:00:00+05:30`;
@@ -232,6 +240,17 @@ export default async function ClientPage({ params }: Params) {
 
       {/* Money is only shown to people who can open Invoices. */}
       {can("invoices") && (
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="eyebrow eyebrow--muted text-[9.5px]">Account</p>
+          <Link
+            href={`/admin/invoices/statement/${client.id}`}
+            className="inline-flex min-h-9 items-center gap-1.5 text-[12px] text-cream-2 transition-colors hover:text-terra-bright"
+          >
+            <Icon.ledger size={13} /> Statement of account
+          </Link>
+        </div>
+      )}
+      {can("invoices") && (
         <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Stat
             label="Billed"
@@ -317,7 +336,7 @@ export default async function ClientPage({ params }: Params) {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[12.5px] text-cream">{t.title}</span>
                             <span
-                              className={`block font-mono text-[10.5px] uppercase tracking-[0.06em] ${late ? "text-rose-300" : "text-sand"}`}
+                              className={`block font-mono text-[10.5px] uppercase tracking-[0.06em] ${late ? "text-bad-300" : "text-sand"}`}
                             >
                               To-do · {t.due_at ? `${late ? "was due" : "due"} ${formatDateShort(t.due_at)}` : "no date"}
                               {t.priority === "high" || t.priority === "urgent" ? ` · ${t.priority}` : ""}
@@ -375,7 +394,7 @@ export default async function ClientPage({ params }: Params) {
                               </span>
                               {d.subject && <span className="text-sand"> · {d.subject}</span>}
                             </span>
-                            <span className={`block font-mono text-[10.5px] ${late ? "text-rose-300" : "text-sand"}`}>
+                            <span className={`block font-mono text-[10.5px] ${late ? "text-bad-300" : "text-sand"}`}>
                               {d.kind === "quote" ? "Quote" : "Invoice"} · {formatDateShort(d.issue_date)}
                               {d.kind === "invoice" && d.due_date ? ` · due ${formatDateShort(d.due_date)}` : ""}
                               {OPEN_STATUSES.includes(d.status) && balance > 0

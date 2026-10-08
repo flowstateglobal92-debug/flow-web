@@ -76,7 +76,7 @@ function Card({
       }}
       className={`group relative select-none border p-3 text-left transition-[box-shadow,border-color,background-color] ${
         overlay
-          ? "pointer-events-none cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.9)] ring-1 ring-terra/50"
+          ? "pointer-events-none cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_var(--shadow-strong)] ring-1 ring-terra/50"
           : isDragging
             ? "cursor-grabbing border-dashed border-cream/20 bg-transparent opacity-30"
             : "cursor-grab border-cream/10 bg-cream/[0.035] hover:border-cream/25 hover:bg-cream/[0.06]"

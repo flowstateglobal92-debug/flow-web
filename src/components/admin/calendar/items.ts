@@ -131,13 +131,13 @@ export const isUnscheduled = (item: CalendarItem) => item.kind === "todo" && ite
 const EVENT_TONE: Record<string, string> = {
   task: "border-cream/20 bg-cream/[0.06] text-cream-2",
   meeting: "border-terra/40 bg-terra/[0.14] text-terra-bright",
-  follow_up: "border-amber-300/35 bg-amber-400/[0.10] text-amber-100",
-  payment: "border-emerald-300/35 bg-emerald-400/[0.10] text-emerald-200",
+  follow_up: "border-warn-300/35 bg-warn-400/[0.10] text-warn-100",
+  payment: "border-ok-300/35 bg-ok-400/[0.10] text-ok-200",
   other: "border-cream/12 bg-cream/[0.04] text-sand",
 };
 
 const TODO_TONE: Record<string, string> = {
-  urgent: "border-rose-300/40 bg-rose-400/[0.10] text-rose-100",
+  urgent: "border-bad-300/40 bg-bad-400/[0.10] text-bad-100",
   high: "border-terra/35 bg-terra/[0.08] text-cream",
   normal: "border-cream/15 bg-ink-3 text-cream-2",
   low: "border-cream/10 bg-ink-3 text-sand",
@@ -152,12 +152,12 @@ export function chipTone(item: CalendarItem) {
       return TODO_TONE[item.tone] ?? TODO_TONE.normal;
     case "invoice_due":
       return item.tone === "overdue"
-        ? "border-rose-300/40 bg-rose-400/[0.08] text-rose-200"
-        : "border-amber-300/30 bg-amber-400/[0.07] text-amber-100";
+        ? "border-bad-300/40 bg-bad-400/[0.08] text-bad-200"
+        : "border-warn-300/30 bg-warn-400/[0.07] text-warn-100";
     case "quote_expiry":
       return "border-cream/12 bg-cream/[0.03] text-sand";
     case "recurring_run":
-      return "border-emerald-300/25 bg-emerald-400/[0.06] text-emerald-200";
+      return "border-ok-300/25 bg-ok-400/[0.06] text-ok-200";
     default:
       return "border-cream/12 bg-cream/[0.04] text-cream-2";
   }
@@ -165,7 +165,7 @@ export function chipTone(item: CalendarItem) {
 
 /** Approved leave is a solid hatched band; pending is a dashed outline. */
 export const HATCH = {
-  backgroundImage: "repeating-linear-gradient(135deg, rgba(243,233,220,0.10) 0 3px, transparent 3px 7px)",
+  backgroundImage: "repeating-linear-gradient(135deg, var(--hatch) 0 3px, transparent 3px 7px)",
 } as const;
 
 /* ─────────────────────────────── events ─────────────────────────────── */

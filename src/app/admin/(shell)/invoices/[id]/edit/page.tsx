@@ -10,7 +10,8 @@ import { Notice } from "@/components/admin/ui";
 import InvoiceEditor from "@/components/admin/invoice/InvoiceEditor";
 import { linkButton } from "@/components/admin/invoice/parts";
 import { docLabel, editorDocFromRow } from "@/lib/admin/invoice-types";
-import { loadClients, loadDocument, loadInvoicePeople, loadLeads, loadSettings } from "../../data";
+import { creditRoom, loadClients, loadDocument, loadEditorExtras, loadInvoicePeople, loadLeads, loadSettings } from "../../data";
+import type { Invoice } from "@/lib/admin/invoice-types";
 
 export const metadata: Metadata = { title: "Edit invoice" };
 
@@ -55,7 +56,9 @@ export default async function EditInvoicePage({
         ? "It's waiting for an admin's approval. Once approved or sent back, it can be edited again."
         : invoice.status === "converted"
           ? "This quote became an invoice — edit the invoice instead."
-          : null;
+          : invoice.kind === "credit_note" && invoice.status !== "draft"
+            ? "An issued credit note doesn't change. Void it and make a new one if it's wrong."
+            : null;
   if (frozen) {
     return (
       <div className="max-w-xl space-y-4">
@@ -70,13 +73,21 @@ export default async function EditInvoicePage({
     );
   }
 
-  const [settings, clients, leads, owners, source] = await Promise.all([
+  const [settings, clients, leads, owners, source, extras, credited] = await Promise.all([
     loadSettings(supabase, profile.workspace),
     loadClients(supabase),
     loadLeads(supabase, profile),
     loadInvoicePeople(supabase, profile),
     invoice.source_quote_id
       ? supabase.from("invoices").select("number").eq("id", invoice.source_quote_id).maybeSingle<{ number: string | null }>()
+      : Promise.resolve({ data: null }),
+    loadEditorExtras(supabase),
+    invoice.credited_invoice_id
+      ? supabase
+          .from("invoices")
+          .select("id, number, currency, total, credited_total")
+          .eq("id", invoice.credited_invoice_id)
+          .maybeSingle<Pick<Invoice, "id" | "number" | "currency" | "total" | "credited_total">>()
       : Promise.resolve({ data: null }),
   ]);
   const note = just ? JUST[just] : null;
@@ -86,7 +97,7 @@ export default async function EditInvoicePage({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         {back}
         <p className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-sand">
-          Editing {invoice.kind === "quote" ? "quote" : "invoice"}
+          Editing {invoice.kind === "quote" ? "quote" : invoice.kind === "credit_note" ? "credit note" : "invoice"}
         </p>
       </div>
       {note && (
@@ -114,6 +125,12 @@ export default async function EditInvoicePage({
         owners={owners.map((o) => ({ id: o.id, name: displayName(o) }))}
         viewer={{ id: profile.id, admin: isApprover(profile), canClients: canAccess(profile, "clients") }}
         today={todayISO()}
+        {...extras}
+        creditFor={
+          credited.data
+            ? { id: credited.data.id, number: credited.data.number, currency: credited.data.currency, room: creditRoom(credited.data) }
+            : null
+        }
       />
     </>
   );

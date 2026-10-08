@@ -41,6 +41,19 @@ export default async function CashflowPage() {
           run_on: r.run_on,
           amount: num(r.amount),
         })),
+        payables: (raw.payables ?? []).map((b) => ({
+          id: b.id,
+          reference: b.reference ?? null,
+          supplier: b.supplier ?? null,
+          due_date: isDay(b.due_date) ? b.due_date : null,
+          balance: num(b.balance),
+        })),
+        recurring_bills: (raw.recurring_bills ?? []).map((b) => ({
+          schedule_id: b.schedule_id,
+          name: b.name,
+          due_on: b.due_on,
+          amount: num(b.amount),
+        })),
         expense_monthly_avg: num(raw.expense_monthly_avg),
         budgets_monthly_total: num(raw.budgets_monthly_total),
       }

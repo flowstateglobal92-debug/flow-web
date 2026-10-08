@@ -12,13 +12,5 @@ export function resend() {
   return client;
 }
 
-/**
- * Resend's SDK returns `{ data, error }` rather than throwing. Unwrapping in
- * one place keeps every call site down to a single line and makes the API's own
- * message the one that reaches the toast.
- */
-export function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
-  if (result.error) throw new Error(result.error.message);
-  if (!result.data) throw new Error("Resend returned an empty response.");
-  return result.data;
-}
+/** Kept here so existing imports keep working; the helper lives in ./core. */
+export { unwrap } from "./core";

@@ -57,6 +57,21 @@ const nextConfig: NextConfig = {
         source: "/admin/:path*",
         headers: [{ key: "Cache-Control", value: "private, no-store, max-age=0" }],
       },
+      {
+        // The pay-online page (0039) posts to PayHere's checkout and is sent on
+        // to Stripe's — those two, and only from here. Later rules win over the
+        // site-wide one for the same header. Never cached, never indexed.
+        source: "/pay/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value:
+              "base-uri 'self'; form-action 'self' https://www.payhere.lk https://sandbox.payhere.lk https://checkout.stripe.com; frame-ancestors 'none'; object-src 'none'",
+          },
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+        ],
+      },
     ];
   },
 };

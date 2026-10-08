@@ -4,6 +4,7 @@ import "./globals.css";
 import SmoothScroll from "@/components/SmoothScroll";
 import { SITE, jsonLd, organizationSchema } from "@/lib/site";
 import { INTRO_BOOT_SCRIPT } from "@/lib/intro";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -96,7 +97,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} h-full antialiased`}
-      // The intro boot script adds `is-preloading` before hydration on purpose.
+      // The boot scripts add `is-preloading` and the admin's `data-theme` before hydration on purpose.
       suppressHydrationWarning
     >
       <head>
@@ -106,6 +107,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             preload is issued from `app/page.tsx`, which React hoists into this
             head ahead of the script. */}
         <script dangerouslySetInnerHTML={{ __html: INTRO_BOOT_SCRIPT }} />
+        {/* Admin pages only: the chosen theme (My account › Appearance), before the first paint. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script
           type="application/ld+json"
           // Organization + WebSite: the identity every page's schema points back to.

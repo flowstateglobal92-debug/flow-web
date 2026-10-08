@@ -296,7 +296,7 @@ function TodoForm({
                         {personName(m)}
                         {m.id === me ? " (you)" : ""}
                       </span>
-                      {out && <span className="shrink-0 font-mono text-[9.5px] uppercase text-amber-200">away</span>}
+                      {out && <span className="shrink-0 font-mono text-[9.5px] uppercase text-warn-200">away</span>}
                       {on && <Icon.check size={13} className="shrink-0 text-terra-bright" />}
                     </button>
                   );
@@ -453,7 +453,7 @@ function Checklist({ todo, canEdit, run, pending }: { todo: Todo; canEdit: boole
                 disabled={pending}
                 onClick={() => run(() => deleteChecklistItem(c.id), { quiet: true })}
                 aria-label={`Remove "${c.body}"`}
-                className="flex h-10 w-10 shrink-0 items-center justify-center text-sand/60 transition-colors hover:text-rose-200"
+                className="flex h-10 w-10 shrink-0 items-center justify-center text-sand/60 transition-colors hover:text-bad-200"
               >
                 <Icon.close size={13} />
               </button>

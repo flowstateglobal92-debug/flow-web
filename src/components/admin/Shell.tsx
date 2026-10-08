@@ -9,6 +9,7 @@ import { Avatar } from "./ui";
 import Bell from "./notifications/Bell";
 import { NotificationsProvider, type NotificationsInitial } from "./notifications/NotificationsProvider";
 import CommandPalette, { SearchTrigger } from "./CommandPalette";
+import RailStatus from "./RailStatus";
 import { signOut } from "@/app/admin/actions/auth";
 import { APPROVALS_NAV, MODULES, NAV_GROUPS, canAccess, type NavGroup } from "@/lib/admin/modules";
 import { ROLE_LABEL, type ShellProfile } from "@/lib/admin/types";
@@ -102,10 +103,12 @@ export default function Shell({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-[13px] font-medium leading-tight">{item.label}</span>
-                      <span className="block truncate text-[10.5px] text-sand/80">{hintFor(item)}</span>
+                      <span className="block truncate text-[10.5px] text-sand/80" data-nav-hint>
+                        {hintFor(item)}
+                      </span>
                     </span>
                     {count > 0 && (
-                      <span className="shrink-0 bg-terra px-1.5 py-0.5 font-mono text-[10px] font-medium text-ink tabular-nums">
+                      <span className="shrink-0 bg-terra px-1.5 py-0.5 font-mono text-[10px] font-medium text-on-terra tabular-nums">
                         {count}
                       </span>
                     )}
@@ -194,9 +197,10 @@ export default function Shell({
           className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r border-cream/[0.08] bg-ink-2/80 backdrop-blur-xl lg:flex"
         >
           {brand}
-          <div className="flex-1 overflow-y-auto px-2 pb-3 scroll-thin" data-lenis-prevent>
+          <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 scroll-thin" data-lenis-prevent>
             {nav}
           </div>
+          <RailStatus />
           {identity}
         </aside>
 
@@ -233,16 +237,17 @@ export default function Shell({
               type="button"
               aria-label="Close menu"
               onClick={() => setOpen(false)}
-              className="absolute inset-0 cursor-default bg-ink/80 backdrop-blur-[3px]"
+              className="absolute inset-0 cursor-default scrim backdrop-blur-[3px]"
             />
             <aside className="rise-in absolute inset-y-0 left-0 flex w-[264px] flex-col border-r border-cream/[0.10] bg-ink-2">
               <Link href="/admin" onClick={() => setOpen(false)} className="flex items-center gap-2.5 px-3 pb-4 pt-4">
                 <Image src="/brand/mark-256.webp" alt="" width={250} height={256} sizes="30px" className="h-[30px] w-auto" />
                 <span className="font-display text-[14px] font-medium text-cream">Flow State</span>
               </Link>
-              <div className="flex-1 overflow-y-auto px-2 pb-3" data-lenis-prevent>
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" data-lenis-prevent>
                 {nav}
               </div>
+              <RailStatus />
               {identity}
             </aside>
           </div>

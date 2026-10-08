@@ -163,7 +163,7 @@ export default function Compose({
                     type="button"
                     aria-label={`Remove ${file.name}`}
                     onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))}
-                    className="shrink-0 text-sand transition-colors hover:text-rose-200"
+                    className="shrink-0 text-sand transition-colors hover:text-bad-200"
                   >
                     <Icon.close size={13} />
                   </button>
@@ -173,7 +173,7 @@ export default function Compose({
           )}
 
           {tooBig && (
-            <p className="mt-2 text-[11.5px] text-rose-200">
+            <p className="mt-2 text-[11.5px] text-bad-200">
               That&apos;s {formatBytes(total)} — trim it to 20MB or send a link instead.
             </p>
           )}

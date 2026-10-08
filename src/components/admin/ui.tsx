@@ -28,7 +28,7 @@ export function Panel({
 }) {
   return (
     <section
-      className={`relative border border-cream/[0.08] bg-[linear-gradient(180deg,rgba(243,233,220,0.045),rgba(243,233,220,0.015))] shadow-[inset_0_1px_0_rgba(243,233,220,0.08),0_30px_70px_-40px_rgba(0,0,0,0.9)] ${className}`}
+      className={`relative border border-cream/[0.08] surface shadow-[inset_0_1px_0_var(--edge-light),0_30px_70px_-40px_var(--shadow-panel)] ${className}`}
     >
       {(title || right) && (
         <header className="flex items-start justify-between gap-3 border-b border-cream/[0.07] px-4 py-3">
@@ -60,11 +60,11 @@ export function Stat({
   const accent = {
     neutral: "text-cream",
     terra: "text-terra-bright",
-    success: "text-emerald-300",
-    danger: "text-rose-300",
+    success: "text-ok-300",
+    danger: "text-bad-300",
   }[tone];
   return (
-    <div className="group relative overflow-hidden border border-cream/[0.08] bg-[linear-gradient(180deg,rgba(243,233,220,0.05),rgba(243,233,220,0.015))] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(243,233,220,0.08)]">
+    <div className="group relative overflow-hidden border border-cream/[0.08] surface px-4 py-3.5 shadow-[inset_0_1px_0_var(--edge-light)]">
       <div
         className="glow-terra pointer-events-none absolute -right-8 -top-10 h-24 w-24 opacity-0 transition-opacity duration-500 group-hover:opacity-40"
         aria-hidden
@@ -104,9 +104,9 @@ export function Badge({
     neutral: "bg-cream/[0.06] text-cream-2 ring-cream/12",
     terra: "bg-terra/15 text-terra-bright ring-terra/30",
     cream: "bg-cream/12 text-cream ring-cream/25",
-    success: "bg-emerald-400/10 text-emerald-200 ring-emerald-300/25",
-    warn: "bg-amber-400/10 text-amber-200 ring-amber-300/25",
-    danger: "bg-rose-400/10 text-rose-200 ring-rose-300/25",
+    success: "bg-ok-400/10 text-ok-200 ring-ok-300/25",
+    warn: "bg-warn-400/10 text-warn-200 ring-warn-300/25",
+    danger: "bg-bad-400/10 text-bad-200 ring-bad-300/25",
     muted: "bg-cream/[0.03] text-sand ring-cream/10",
   }[tone];
   return (
@@ -144,7 +144,7 @@ export function Button({ variant = "ghost", size = "sm", className = "", childre
     ghost:
       "border border-cream/12 bg-cream/[0.03] text-cream-2 hover:border-cream/30 hover:bg-cream/[0.06] hover:text-cream",
     danger:
-      "border border-rose-400/25 bg-rose-500/[0.07] text-rose-200 hover:border-rose-400/50 hover:bg-rose-500/[0.12]",
+      "border border-bad-400/25 bg-bad-500/[0.07] text-bad-200 hover:border-bad-400/50 hover:bg-bad-500/[0.12]",
     quiet: "text-sand hover:text-cream",
   }[variant];
   return (
@@ -241,7 +241,7 @@ export function Checkbox({
 }: Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & { label: ReactNode; hint?: ReactNode }) {
   return (
     <label className={`flex cursor-pointer items-start gap-2.5 ${className}`}>
-      <input {...rest} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[#c65d3b]" />
+      <input {...rest} type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-terra" />
       <span className="min-w-0">
         <span className="block text-[12.5px] text-cream-2">{label}</span>
         {hint && <span className="mt-0.5 block text-[11px] leading-snug text-sand/80">{hint}</span>}
@@ -279,9 +279,9 @@ export function Notice({
   children?: ReactNode;
 }) {
   const t = {
-    warn: "border-amber-300/25 bg-amber-400/[0.07] text-amber-100",
+    warn: "border-warn-300/25 bg-warn-400/[0.07] text-warn-100",
     info: "border-terra/30 bg-terra/[0.08] text-cream-2",
-    danger: "border-rose-400/25 bg-rose-500/[0.08] text-rose-200",
+    danger: "border-bad-400/25 bg-bad-500/[0.08] text-bad-200",
   }[tone];
   return (
     <div className={`border px-3.5 py-3 text-[12.5px] ${t}`}>

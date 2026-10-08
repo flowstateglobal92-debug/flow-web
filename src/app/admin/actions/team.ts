@@ -7,9 +7,10 @@ import { DEMO_EMAIL } from "@/lib/admin/demo";
 import { ensureDemoUsers, resetDemoData } from "@/lib/admin/demo-server";
 import { GRANTABLE } from "@/lib/admin/modules";
 import { displayName } from "@/lib/admin/team";
-import type { ModuleKey, Role } from "@/lib/admin/types";
+import { BAN_FOREVER, EMAIL_TAKEN, EMAIL_TAKEN_MESSAGE, checkAccount, createdMessage } from "@/lib/admin/team-core";
+import type { Role } from "@/lib/admin/types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fail, ok, optional, text, type ActionResult } from "./shared";
+import { fail, ok, text, type ActionResult } from "./shared";
 
 /**
  * Team & Users — the only place accounts are created, changed and removed.
@@ -21,30 +22,21 @@ import { fail, ok, optional, text, type ActionResult } from "./shared";
  * workspace and off the demo accounts.
  */
 
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** "Never" for a ban, as GoTrue spells it — about a hundred years. */
-const BAN_FOREVER = "876000h";
-
 type Target = { id: string; email: string; full_name: string | null; role: Role; is_active: boolean };
 
+/** The form, checked by the rules the desktop app's team function shares (@/lib/admin/team-core). */
 function readAccount(formData: FormData, { passwordRequired }: { passwordRequired: boolean }) {
-  const full_name = text(formData, "full_name");
-  const email = text(formData, "email").toLowerCase();
-  // Passwords are taken exactly as typed — spaces included.
-  const password = String(formData.get("password") ?? "");
-  // Anything but "admin" is a member: the form can never ask for super_admin.
-  const role: "admin" | "member" = text(formData, "role") === "admin" ? "admin" : "member";
-  const ticked = formData.getAll("permissions").map(String);
-  const permissions: ModuleKey[] = role === "member" ? GRANTABLE.filter((k) => ticked.includes(k)) : [];
-
-  if (!full_name) throw new Error("Add their name.");
-  if (!EMAIL.test(email)) throw new Error("That email address doesn't look right.");
-  if (email === DEMO_EMAIL) throw new Error("That address belongs to the demo account.");
-  if (passwordRequired && !password) throw new Error("Set a password for them.");
-  if (password && password.length < 8) throw new Error("Use at least 8 characters for the password.");
-
-  return { full_name, email, title: optional(formData, "title"), password, role, permissions };
+  return checkAccount(
+    {
+      full_name: text(formData, "full_name"),
+      email: text(formData, "email"),
+      title: text(formData, "title"),
+      password: String(formData.get("password") ?? ""),
+      role: text(formData, "role"),
+      permissions: formData.getAll("permissions").map(String),
+    },
+    { passwordRequired, grantable: GRANTABLE, demoEmail: DEMO_EMAIL },
+  );
 }
 
 /** Someone on my team (RLS keeps it to the live workspace) — never myself. */
@@ -79,8 +71,8 @@ export async function createTeamUser(formData: FormData): Promise<ActionResult> 
     });
     if (error) {
       // Usually someone who signed up on their own: they're in the list as "No access".
-      if (/already (been )?registered|already exists/i.test(error.message)) {
-        return { ok: false, error: "That email already has an account — find it in the list and edit its access." };
+      if (EMAIL_TAKEN.test(error.message)) {
+        return { ok: false, error: EMAIL_TAKEN_MESSAGE };
       }
       throw error;
     }
@@ -104,13 +96,7 @@ export async function createTeamUser(formData: FormData): Promise<ActionResult> 
     }
 
     revalidatePath("/admin/team");
-    const first = input.full_name.split(/\s+/)[0];
-    return ok(
-      input.role === "member" && input.permissions.length === 0
-        ? `${first} is set up, but no modules are ticked yet.`
-        : `${first} can sign in now.`,
-      id,
-    );
+    return ok(createdMessage(input), id);
   } catch (e) {
     return fail(e);
   }

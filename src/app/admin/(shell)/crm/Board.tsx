@@ -44,8 +44,8 @@ export type TrailEntry = LeadActivity & { actor_id: string | null };
 const TONE: Record<StageTone, { dot: string; text: string }> = {
   terra: { dot: "bg-terra", text: "text-terra-bright" },
   cream: { dot: "bg-cream/60", text: "text-cream-2" },
-  success: { dot: "bg-emerald-300", text: "text-emerald-200" },
-  warn: { dot: "bg-amber-300", text: "text-amber-200" },
+  success: { dot: "bg-ok-300", text: "text-ok-200" },
+  warn: { dot: "bg-warn-300", text: "text-warn-200" },
   muted: { dot: "bg-sand/60", text: "text-sand" },
 };
 
@@ -107,7 +107,7 @@ function LeadCard({
         listeners?.onKeyDown?.(e);
       }}
       className={`group relative select-none border p-3 text-left transition-[box-shadow,border-color,background-color] ${overlay
-          ? "pointer-events-none rotate-[2deg] scale-[1.02] cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.9)] ring-1 ring-terra/50"
+          ? "pointer-events-none rotate-[2deg] scale-[1.02] cursor-grabbing border-terra/60 bg-ink-2 shadow-[0_25px_50px_-12px_var(--shadow-strong)] ring-1 ring-terra/50"
           : isDragging
             ? "cursor-grabbing border-dashed border-cream/20 bg-transparent opacity-30"
             : "cursor-grab border-cream/10 bg-cream/[0.035] hover:border-cream/25 hover:bg-cream/[0.06]"
@@ -413,7 +413,7 @@ export default function Board({
       {/* Toolbar */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={() => setLeadModal({ mode: "create" })}>
+          <Button variant="primary" data-shortcut="new" onClick={() => setLeadModal({ mode: "create" })}>
             <Icon.plus size={13} /> Add lead
           </Button>
           <Button onClick={() => setStageModal({ mode: "create" })} className="pointer-coarse:min-h-9">
@@ -440,7 +440,7 @@ export default function Board({
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <span className="font-mono text-[11px] text-sand tabular-nums">
             {scoped.length} leads · <span className="text-cream-2">{moneyShort(totals.openValue)}</span> open ·{" "}
-            <span className="text-emerald-200">{moneyShort(totals.wonValue)}</span> won
+            <span className="text-ok-200">{moneyShort(totals.wonValue)}</span> won
           </span>
           <div className="relative w-full sm:w-56">
             <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sand">
@@ -738,7 +738,7 @@ export default function Board({
                 type="checkbox"
                 name="is_won"
                 defaultChecked={stageModal?.stage?.is_won}
-                className="h-3.5 w-3.5 accent-[#c65d3b]"
+                className="h-3.5 w-3.5 accent-terra"
               />
               Counts as won
             </label>
@@ -747,7 +747,7 @@ export default function Board({
                 type="checkbox"
                 name="is_lost"
                 defaultChecked={stageModal?.stage?.is_lost}
-                className="h-3.5 w-3.5 accent-[#c65d3b]"
+                className="h-3.5 w-3.5 accent-terra"
               />
               Counts as lost
             </label>

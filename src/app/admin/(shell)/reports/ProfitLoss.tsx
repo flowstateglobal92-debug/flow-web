@@ -36,7 +36,9 @@ export default function ProfitLoss({
   categories,
   months,
   isCurrent,
+  fyStart = 4,
 }: {
+  fyStart?: number;
   error: string | null;
   period: Period;
   at: string;
@@ -66,7 +68,7 @@ export default function ProfitLoss({
 
   const go = (params: Record<string, string>) => router.push(`/admin/reports?${new URLSearchParams(params)}`);
   const step = (n: number) => {
-    if (period !== "custom") go({ period, at: shiftPeriod(period, at, n) });
+    if (period !== "custom") go({ period, at: shiftPeriod(period, at, n, fyStart) });
   };
 
   const margin = current.income > 0 ? (current.net / current.income) * 100 : null;
@@ -222,7 +224,7 @@ export default function ProfitLoss({
                       <td className="px-2 py-1.5 text-cream-2">{periodLabel("month", m.month, m.month)}</td>
                       <td className="px-2 py-1.5 text-right font-mono tabular-nums text-cream-2">{money(m.income)}</td>
                       <td className="px-2 py-1.5 text-right font-mono tabular-nums text-cream-2">{money(m.expense)}</td>
-                      <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${m.net < 0 ? "text-rose-300" : "text-cream"}`}>{money(m.net)}</td>
+                      <td className={`px-2 py-1.5 text-right font-mono tabular-nums ${m.net < 0 ? "text-bad-300" : "text-cream"}`}>{money(m.net)}</td>
                     </tr>
                   ))}
                 </tbody>
