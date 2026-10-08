@@ -169,15 +169,19 @@ Edge Functions. Nothing here changes the website. Once, on the project:
    for the release workflow).
    - A stopped instance makes Postgres keep WAL for it: add a disk-usage alert,
      and delete the instance's replication slot if you ever retire it.
-4. **Edge Functions** — the mailbox and Team & Users for the desktop app:
+4. **Edge Functions** — the mailbox, Team & Users and emailed documents for
+   the desktop app. After `supabase login` (once per computer):
    ```bash
-   node scripts/sync-edge-shared.mjs          # copies the shared mailbox/team code in
-   supabase functions deploy mail
-   supabase functions deploy team
-   supabase secrets set RESEND_API_KEY=… EMAIL_FROM_ADDRESS=support@flowstate.lk EMAIL_FROM_NAME="Flow State" EMAIL_INBOX_ADDRESSES=support@flowstate.lk
+   node scripts/deploy-edge-functions.mjs --check   # ready? changes nothing
+   node scripts/deploy-edge-functions.mjs           # deploy mail + team, set their secrets
    ```
-   Supabase gives functions the project URL, anon key and service role key on
-   its own. Both functions check the caller's session and access themselves.
+   It copies the shared mailbox/team code in (`scripts/sync-edge-shared.mjs`),
+   deploys both functions (`--use-api`, so no Docker; `--no-verify-jwt`,
+   because both functions check the caller's session and access themselves)
+   and sets RESEND_API_KEY, EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME and
+   EMAIL_INBOX_ADDRESSES from `.env.local` without printing them. Supabase
+   gives functions the project URL, anon key and service role key on its own.
+   Run it again whenever a function changes.
 
 After a migration that adds or changes a synced table: re-run
 `desktop/scripts/gen-schema.mjs` against a migrated database, update and
